@@ -1,0 +1,14 @@
+{
+  "name": "ProjectMusic",
+  "short_name": "ProjectMusic",
+  "description": "Pemutar musik web gratis, ringan, dan open source.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "lang": "id",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,177 @@
+/* ProjectMusic — gaya dibuat sederhana: tanpa blur/shadow berat agar ringan di HP lama. */
+:root {
+  --bg: #121212;
+  --surface: #1c1c1c;
+  --surface-2: #262626;
+  --text: #f2f2f2;
+  --muted: #a0a0a0;
+  --accent: #1ed760;
+  --accent-ink: #0b0b0b;
+  --danger: #ff6b6b;
+  --tabbar-h: 58px;
+  --mini-h: 62px;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input { font: inherit; }
+img { display: block; }
+[hidden] { display: none !important; }
+
+.ic { width: 24px; height: 24px; fill: currentColor; flex: none; }
+
+/* ---------- Kerangka ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 5;
+  padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
+  background: var(--bg);
+}
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
+.brand .ic { color: var(--accent); }
+
+.view {
+  padding: 0 16px calc(var(--tabbar-h) + var(--mini-h) + 24px);
+  max-width: 900px; margin: 0 auto; outline: none;
+}
+.view h1 { font-size: 22px; margin: 8px 0 12px; }
+.view h2 { font-size: 17px; margin: 20px 0 8px; }
+.hint { color: var(--muted); font-size: 14px; }
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #0d0d0d; border-top: 1px solid #222;
+}
+.tabbar a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; font-size: 11px; color: var(--muted);
+}
+.tabbar a.active { color: var(--text); }
+.tabbar a.active .ic { color: var(--accent); }
+
+/* ---------- Komponen ---------- */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; padding: 6px 14px; border-radius: 999px;
+  background: var(--surface-2); font-size: 14px; white-space: nowrap;
+}
+.chip.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.search-box {
+  width: 100%; padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid #333; background: var(--surface); color: var(--text);
+}
+.search-box:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; border-radius: 999px; background: var(--surface-2); font-weight: 600;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%; color: var(--muted);
+}
+.icon-btn:active { background: var(--surface-2); }
+.icon-btn.on { color: var(--accent); }
+
+/* Daftar lagu */
+.tracks { list-style: none; margin: 0; padding: 0; }
+.track {
+  display: flex; align-items: center; gap: 12px; padding: 6px 0;
+  content-visibility: auto; contain-intrinsic-size: 0 56px; /* render hanya yang terlihat */
+}
+.track-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
+.track img, .art-ph {
+  width: 48px; height: 48px; border-radius: 6px; background: var(--surface-2); object-fit: cover; flex: none;
+}
+.art-ph { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.track-text { min-width: 0; }
+.track-text b, .track-text small {
+  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.track-text b { font-weight: 500; }
+.track-text small { color: var(--muted); font-size: 13px; }
+.track.playing .track-text b { color: var(--accent); }
+.track-dur { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.state { padding: 32px 0; text-align: center; color: var(--muted); }
+.state.error { color: var(--danger); }
+
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #222; }
+.setting small { display: block; color: var(--muted); }
+
+/* ---------- Mini player ---------- */
+.mini {
+  position: fixed; left: 8px; right: 8px; z-index: 9;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 6px);
+  height: var(--mini-h); display: flex; align-items: center; gap: 4px;
+  padding: 0 6px 0 8px; border-radius: var(--radius); background: var(--surface-2);
+  overflow: hidden; max-width: 884px; margin: 0 auto;
+}
+.mini-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #3a3a3a; }
+#mini-bar { height: 100%; width: 0; background: var(--text); }
+.mini-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; }
+.mini-info img { width: 44px; height: 44px; border-radius: 6px; background: #333; object-fit: cover; }
+.mini-text { min-width: 0; }
+.mini-text b, .mini-text small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mini-text small { color: var(--muted); font-size: 13px; }
+.mini .icon-btn { color: var(--text); }
+
+/* ---------- Sedang diputar ---------- */
+.np {
+  position: fixed; inset: 0; z-index: 20; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  background: linear-gradient(#2a2a2a, var(--bg) 60%);
+}
+.np > * { width: 100%; max-width: 420px; }
+.np-close { align-self: flex-start; width: 40px; color: var(--text); }
+.np-art {
+  aspect-ratio: 1; height: auto; margin: 16px 0 24px; border-radius: 12px;
+  background: var(--surface-2); object-fit: cover;
+}
+.np-meta { display: flex; align-items: center; gap: 12px; }
+.np-text { flex: 1; min-width: 0; }
+.np-text h2, .np-text p { margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.np-text h2 { font-size: 20px; }
+.np-text p { color: var(--muted); }
+.seek { margin: 20px 0 4px; accent-color: var(--accent); }
+.np-times { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.np-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.np-controls .big { width: 52px; height: 52px; color: var(--text); }
+.np-controls .big .ic { width: 34px; height: 34px; }
+.play-btn {
+  width: 68px; height: 68px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--text); color: var(--bg);
+}
+.play-btn .ic { width: 36px; height: 36px; }
+.np-source { color: var(--muted); font-size: 12px; text-align: center; margin-top: 24px; }
+.np-source a { text-decoration: underline; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; left: 50%; z-index: 30; transform: translateX(-50%);
+  bottom: calc(var(--tabbar-h) + var(--mini-h) + 24px);
+  padding: 10px 16px; border-radius: 8px; background: var(--text); color: var(--bg);
+  font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s;
+  max-width: calc(100% - 32px);
+}
+.toast.show { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
