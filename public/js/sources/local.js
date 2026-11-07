@@ -7,7 +7,7 @@ function titleFromName(name) {
   // Pola umum "Artis - Judul"
   const parts = base.split(' - ');
   if (parts.length >= 2) return { artist: parts.shift().trim(), title: parts.join(' - ').trim() };
-  return { artist: 'File lokal', title: base || name };
+  return { artist: 'Local file', title: base || name };
 }
 
 export function fromFiles(fileList) {

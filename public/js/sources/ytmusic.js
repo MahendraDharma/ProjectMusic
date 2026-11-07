@@ -75,3 +75,5 @@ export function lyrics(track, signal) {
 
 export const streamUrl = (track) => `${base}api/stream?id=${encodeURIComponent(track.videoId)}`;
 export const downloadUrl = (track) => streamUrl(track) + '&download=1';
+// Artwork through the server, with CORS, so it can be drawn on a <canvas> (share cards, colours).
+export const imageUrl = (url) => (url ? `${base}api/image?url=${encodeURIComponent(url)}` : '');
