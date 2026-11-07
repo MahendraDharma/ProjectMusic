@@ -1,0 +1,3 @@
+# Library murni Python — tidak perlu kompilasi, aman untuk Termux/HP lama.
+ytmusicapi>=1.10
+yt-dlp[default]>=2025.10.22
