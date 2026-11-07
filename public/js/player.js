@@ -232,7 +232,7 @@ class Player extends EventTarget {
     const t = this.current;
     const artwork = t.artworkLarge
       ? [{ src: t.artworkLarge, sizes: '480x480', type: 'image/jpeg' }]
-      : [{ src: 'icons/icon.svg', sizes: 'any', type: 'image/svg+xml' }];
+      : [{ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }];
     navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, artwork });
   }
 

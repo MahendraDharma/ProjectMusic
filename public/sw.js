@@ -12,6 +12,8 @@ const SHELL = [
   'js/sources/local.js',
   'js/sources/ytmusic.js',
   'icons/icon.svg',
+  'icons/icon-192.png',
+  'icons/apple-touch-icon.png',
   'manifest.webmanifest',
 ];
 
