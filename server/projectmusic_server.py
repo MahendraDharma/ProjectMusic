@@ -49,6 +49,18 @@ PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
 USER_AGENT = "ProjectMusic/" + VERSION
 
+# Situs yang boleh memakai server ini dari browser (CORS). Hanya tampilan ProjectMusic
+# di GitHub Pages milik Anda + localhost; situs lain ditolak supaya server tidak
+# disalahgunakan. Tambah alamat lain lewat PM_ALLOWED_ORIGINS (pisahkan dengan koma).
+ALLOWED_ORIGINS = {"https://mahendradharma.github.io"} | {
+    o.strip().rstrip("/") for o in os.environ.get("PM_ALLOWED_ORIGINS", "").split(",") if o.strip()
+}
+LOCAL_ORIGIN = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+
+
+def origin_allowed(origin: str | None) -> bool:
+    return bool(origin) and (origin in ALLOWED_ORIGINS or bool(LOCAL_ORIGIN.match(origin)))
+
 # Python dari python.org di Mac tidak memakai sertifikat sistem, sehingga HTTPS bisa
 # gagal (CERTIFICATE_VERIFY_FAILED). Pakai paket certifi (ikut terpasang bersama yt-dlp).
 try:
@@ -411,6 +423,29 @@ def resolve_audio(vid: str, fresh: bool = False) -> dict:
 class Handler(BaseHTTPRequestHandler):
     server_version = "ProjectMusic/" + VERSION
     protocol_version = "HTTP/1.1"
+
+    def end_headers(self):
+        # Izinkan tampilan ProjectMusic di GitHub Pages memanggil server ini.
+        origin = self.headers.get("Origin")
+        if origin_allowed(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Vary", "Origin")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        # Pemeriksaan awal browser sebelum situs HTTPS memanggil server di jaringan lokal.
+        if not origin_allowed(self.headers.get("Origin")):
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def log_message(self, fmt, *args):  # log ringkas
         sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
