@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -47,6 +48,21 @@ ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
 USER_AGENT = "ProjectMusic/" + VERSION
+
+# Python dari python.org di Mac tidak memakai sertifikat sistem, sehingga HTTPS bisa
+# gagal (CERTIFICATE_VERIFY_FAILED). Pakai paket certifi (ikut terpasang bersama yt-dlp).
+try:
+    import certifi
+
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except ImportError:  # pragma: no cover
+    SSL_CONTEXT = ssl.create_default_context()
+_opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=SSL_CONTEXT))
+
+
+def urlopen(req, timeout):
+    return _opener.open(req, timeout=timeout)
+
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/javascript", ".js")
@@ -306,7 +322,7 @@ def api_lyrics(q):
                     "https://lrclib.net/api/get?" + urllib.parse.urlencode(params),
                     headers={"User-Agent": USER_AGENT},
                 )
-                with urllib.request.urlopen(req, timeout=8) as r:
+                with urlopen(req, timeout=8) as r:
                     data = json.load(r)
                 if data.get("syncedLyrics"):
                     result.update(synced=_lrc_lines(data["syncedLyrics"]), source="LRCLIB")
@@ -467,7 +483,7 @@ class Handler(BaseHTTPRequestHandler):
                 headers["Range"] = self.headers["Range"]
             req = urllib.request.Request(info["url"], headers=headers, method=self.command)
             try:
-                upstream = urllib.request.urlopen(req, timeout=20)
+                upstream = urlopen(req, timeout=20)
                 break
             except urllib.error.HTTPError as e:
                 if e.code == 416:  # range di luar batas
