@@ -132,6 +132,31 @@ function artistRow(artists) {
       h('span', {}, a.name))));
 }
 
+/* ---------- Pengaturan server pribadi ---------- */
+function serverSettings() {
+  const input = h('input', {
+    class: 'search-box', type: 'url', inputmode: 'url', autocomplete: 'off',
+    placeholder: ytmusic.DEFAULT_SERVER, value: prefs.get('serverUrl') || '',
+    'aria-label': 'Alamat server',
+  });
+  const status = h('p', { class: 'hint' }, server
+    ? `✅ Tersambung ke server ProjectMusic ${server.version} di ${server.base} (YouTube Music, negara ${server.country}).`
+    : '⚪ Server belum tersambung — sekarang hanya musik indie dari Audius.');
+  const connect = async () => {
+    prefs.set('serverUrl', ytmusic.normalizeBase(input.value));
+    status.textContent = 'Menghubungkan…';
+    const info = await connectServer();
+    toast(info ? 'Server tersambung' : 'Server tidak ditemukan');
+  };
+  return h('div', { class: 'setting-block' },
+    h('h2', {}, 'Server pribadi (YouTube Music)'),
+    status,
+    h('p', { class: 'hint' }, 'Kosongkan untuk memakai alamat bawaan (localhost:8080). Panduan: docs/PANDUAN-SERVER.md di GitHub.'),
+    input,
+    h('div', { class: 'row-actions' }, h('button', { class: 'btn primary', onclick: connect }, 'Sambungkan ulang')),
+  );
+}
+
 /* ---------- Halaman ---------- */
 let pageAbort;
 
@@ -329,9 +354,7 @@ const pages = {
           onchange: (e) => prefs.set('autoRadio', e.target.checked),
         }),
       ),
-      h('p', { class: 'hint' }, server
-        ? `Tersambung ke server pribadi ProjectMusic ${server.version} (YouTube Music, negara ${server.country}).`
-        : 'Mode web saja (musik indie dari Audius). Untuk lagu YouTube Music, jalankan server pribadi — lihat panduan di README.'),
+      serverSettings(),
       h('p', { class: 'hint' }, 'Data favorit & riwayat hanya disimpan di browser ini.'),
     );
   },
@@ -587,16 +610,27 @@ document.addEventListener('keydown', (e) => {
 player.addEventListener('state', () => { syncNowPlaying(); fillRadio(); });
 player.addEventListener('time', syncTime);
 player.addEventListener('queue', () => { if (currentPage === 'queue') render(); });
-player.addEventListener('error', (e) => toast(e.detail.message));
+player.addEventListener('error', (e) => {
+  const t = player.current;
+  toast(t && t.source === 'ytmusic' && !server
+    ? 'Server ProjectMusic belum menyala — nyalakan server untuk lagu YouTube Music'
+    : e.detail.message);
+});
 
 window.addEventListener('hashchange', () => { np.hidden = true; render(); view.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 window.addEventListener('offline', () => toast('Kamu sedang offline'));
 
-ytmusic.detect().then((info) => {
-  server = info;
+// Lagu YouTube Music selalu diputar lewat alamat server yang sedang tersambung.
+player.resolve = (t) => (t.source === 'ytmusic' ? ytmusic.streamUrl(t) : t.streamUrl);
+
+async function connectServer() {
+  server = await ytmusic.detect(prefs.get('serverUrl'));
+  player.refreshSource();
   render();
   syncNowPlaying();
-});
+  return server;
+}
+connectServer();
 
 // Service worker → aplikasi bisa di-"install" & dibuka lebih cepat (PWA).
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

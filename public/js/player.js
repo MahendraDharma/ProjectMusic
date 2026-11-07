@@ -13,6 +13,8 @@ class Player extends EventTarget {
     this.shuffle = false;
     this.repeat = 'off'; // 'off' | 'all' | 'one'
     this._errors = 0;
+    // Diisi app.js: menentukan URL audio sebenarnya (mis. alamat server pribadi).
+    this.resolve = (t) => t.streamUrl;
     this._bindAudio();
     this._bindMediaSession();
     this._restore();
@@ -42,6 +44,7 @@ class Player extends EventTarget {
 
   toggle() {
     if (!this.current) return;
+    if (!this.audio.getAttribute('src')) return this._load(true);
     if (this.audio.paused) this._play();
     else this.audio.pause();
   }
@@ -111,6 +114,14 @@ class Player extends EventTarget {
     this._changed();
   }
 
+  /** Pasang ulang sumber audio lagu saat ini tanpa memutar (mis. setelah server tersambung). */
+  refreshSource() {
+    const t = this.current;
+    if (!t || this.playing) return;
+    this.audio.preload = 'metadata';
+    this.audio.src = this.resolve(t);
+  }
+
   /** Sisa lagu setelah yang sedang diputar. */
   get remaining() {
     return this.order.length - 1 - this.pos;
@@ -160,7 +171,7 @@ class Player extends EventTarget {
   _load(autoplay) {
     const t = this.current;
     if (!t) return;
-    this.audio.src = t.streamUrl;
+    this.audio.src = this.resolve(t);
     this._updateMediaSession();
     this._changed();
     if (autoplay) this._play();
@@ -262,11 +273,8 @@ class Player extends EventTarget {
     this.queue = q.tracks;
     this.order = q.tracks.map((_, i) => i);
     this.pos = q.tracks.length ? Math.max(0, Math.min(q.at, q.tracks.length - 1)) : -1;
-    if (this.current) {
-      this.audio.src = this.current.streamUrl;
-      this.audio.preload = 'metadata';
-      this._updateMediaSession();
-    }
+    // URL audio baru dipasang lewat refreshSource() setelah server terdeteksi.
+    if (this.current) this._updateMediaSession();
   }
 
   _emit(type, detail) {

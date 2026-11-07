@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -47,6 +48,33 @@ ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
 USER_AGENT = "ProjectMusic/" + VERSION
+
+# Situs yang boleh memakai server ini dari browser (CORS). Hanya tampilan ProjectMusic
+# di GitHub Pages milik Anda + localhost; situs lain ditolak supaya server tidak
+# disalahgunakan. Tambah alamat lain lewat PM_ALLOWED_ORIGINS (pisahkan dengan koma).
+ALLOWED_ORIGINS = {"https://mahendradharma.github.io"} | {
+    o.strip().rstrip("/") for o in os.environ.get("PM_ALLOWED_ORIGINS", "").split(",") if o.strip()
+}
+LOCAL_ORIGIN = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+
+
+def origin_allowed(origin: str | None) -> bool:
+    return bool(origin) and (origin in ALLOWED_ORIGINS or bool(LOCAL_ORIGIN.match(origin)))
+
+# Python dari python.org di Mac tidak memakai sertifikat sistem, sehingga HTTPS bisa
+# gagal (CERTIFICATE_VERIFY_FAILED). Pakai paket certifi (ikut terpasang bersama yt-dlp).
+try:
+    import certifi
+
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except ImportError:  # pragma: no cover
+    SSL_CONTEXT = ssl.create_default_context()
+_opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=SSL_CONTEXT))
+
+
+def urlopen(req, timeout):
+    return _opener.open(req, timeout=timeout)
+
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/javascript", ".js")
@@ -306,7 +334,7 @@ def api_lyrics(q):
                     "https://lrclib.net/api/get?" + urllib.parse.urlencode(params),
                     headers={"User-Agent": USER_AGENT},
                 )
-                with urllib.request.urlopen(req, timeout=8) as r:
+                with urlopen(req, timeout=8) as r:
                     data = json.load(r)
                 if data.get("syncedLyrics"):
                     result.update(synced=_lrc_lines(data["syncedLyrics"]), source="LRCLIB")
@@ -396,6 +424,29 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "ProjectMusic/" + VERSION
     protocol_version = "HTTP/1.1"
 
+    def end_headers(self):
+        # Izinkan tampilan ProjectMusic di GitHub Pages memanggil server ini.
+        origin = self.headers.get("Origin")
+        if origin_allowed(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Vary", "Origin")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        # Pemeriksaan awal browser sebelum situs HTTPS memanggil server di jaringan lokal.
+        if not origin_allowed(self.headers.get("Origin")):
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def log_message(self, fmt, *args):  # log ringkas
         sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
@@ -467,7 +518,7 @@ class Handler(BaseHTTPRequestHandler):
                 headers["Range"] = self.headers["Range"]
             req = urllib.request.Request(info["url"], headers=headers, method=self.command)
             try:
-                upstream = urllib.request.urlopen(req, timeout=20)
+                upstream = urlopen(req, timeout=20)
                 break
             except urllib.error.HTTPError as e:
                 if e.code == 416:  # range di luar batas
