@@ -1,0 +1,26 @@
+/* Kaca tipis (versi lebih tenang): material kaca HANYA untuk elemen yang melayang
+   di atas konten — bilah tab, mini player, menu lagu, dan bilah pemutar desktop.
+   Konten tetap solid. Di aplikasi: otomatis solid di HP lemah / Reduce Transparency. */
+:root{
+  --glass:rgba(23,24,27,.78);
+  --glass-edge:inset 0 0 0 .5px rgba(255,255,255,.10);
+  --blur:blur(20px) saturate(140%);
+}
+/* ---------- HP ---------- */
+.phone{isolation:isolate}
+.ambient{display:none}
+.scr{padding-bottom:0}
+.tabs{background:var(--glass);border-top:0;box-shadow:inset 0 .5px 0 rgba(255,255,255,.08);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+.mini{background:color-mix(in srgb,var(--tint) 45%,rgba(30,31,35,.82));box-shadow:var(--glass-edge),0 8px 24px -10px rgba(0,0,0,.6);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+/* Sedang diputar: warna sampul hanya sebagai rona lembut di bagian atas */
+.np{background:var(--bg)}
+.npbg{position:absolute;inset:-20% -20% auto;width:140%;height:75%;object-fit:cover;filter:blur(90px) saturate(120%) brightness(.45);opacity:.7;z-index:-1;
+  -webkit-mask-image:linear-gradient(#000 30%,transparent);mask-image:linear-gradient(#000 30%,transparent)}
+.chip2{background:rgba(255,255,255,.08)}
+/* Menu lagu */
+.dimmed{filter:brightness(.4)}
+.sheet{background:var(--glass);box-shadow:var(--glass-edge),0 -10px 30px rgba(0,0,0,.45);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+/* ---------- Desktop: panel solid, hanya bilah pemutar yang kaca ---------- */
+.appbg{display:none}
+.bar{background:var(--glass);box-shadow:inset 0 .5px 0 rgba(255,255,255,.08);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-radius:10px;margin-bottom:8px}
+.app{grid-template-rows:772px 84px;padding-bottom:8px;height:876px}
