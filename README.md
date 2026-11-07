@@ -1,109 +1,104 @@
-# ProjectMusic 🎵
+# ProjectMusic
 
-Pemutar musik **web** yang **gratis**, **ringan**, dan **open source**.
+A **free**, **lightweight**, **open-source** music player for the web — part of the
+"Project" family of apps (alongside [Project-Fit](https://github.com/MahendraDharma/project-fit)).
 
-Lahir dari keresahan: aplikasi musik sekarang sedikit-sedikit berbayar, makin berat,
-dan membebani HP lama. ProjectMusic mencoba kebalikannya — cukup buka di browser,
-tanpa akun, tanpa iklan, tanpa install.
+It started from a simple frustration: music apps keep putting more behind a paywall, and they
+keep getting heavier for older phones. ProjectMusic goes the other way — open it in a browser,
+no account, no ads, nothing to install.
 
-Terinspirasi dari [BitChord](https://github.com/kushagrasinghx/BitChord) (aplikasi
-Android). Bedanya, ProjectMusic dibangun untuk web dan hanya memakai sumber musik
-yang legal untuk di-*stream* gratis.
+*Bahasa Indonesia: the app can be switched to Bahasa Indonesia in Settings, and the server
+guide is available in [Indonesian](docs/PANDUAN-SERVER.md).*
 
-## Dua cara pakai
+## Two ways to use it
 
-| | **Mode web** (GitHub Pages) | **Mode server pribadi** |
+| | **Web mode** (GitHub Pages) | **Personal server mode** |
 |---|---|---|
-| Cara buka | Langsung buka link | Jalankan server di laptop/HP Android sendiri |
-| Katalog lagu | Musik indie dari [Audius](https://audius.org) | **YouTube Music**: tangga lagu Indonesia, semua artis populer |
-| Lirik, radio otomatis, unduh | ❌ | ✅ |
-| Untuk siapa | Siapa saja | **Pemakaian pribadi** |
+| How | Just open the link | Run the small server on your own laptop or Android phone |
+| Catalogue | Indie music from [Audius](https://audius.org) | **YouTube Music**: charts, every popular artist |
+| Lyrics, radio, downloads, share cards | — | ✅ |
+| For | Anyone | **Personal use** |
 
-👉 **Panduan server pribadi (bahasa Indonesia):** [docs/PANDUAN-SERVER.md](docs/PANDUAN-SERVER.md)
+👉 **Server guide:** [English](docs/SERVER-GUIDE.md) · [Bahasa Indonesia](docs/PANDUAN-SERVER.md)
 
-## Fitur
+## Features
 
-- 🔥 Beranda: **Trending 20 Indonesia**, Top Music Videos, artis populer, dan rekomendasi dari lagu terakhir*
-- 🔍 Pencarian lagu & artis, **halaman artis***
-- 📻 **Radio otomatis**: antrean tidak pernah habis, terus disambung lagu yang mirip*
-- 🎤 **Lirik tersinkron** dengan lagu (dari LRCLIB / YouTube Music), ketuk baris untuk lompat*
-- ⬇️ **Unduh** lagu untuk disimpan*
-- ▶️ Antrean, **acak**, **ulangi**, ⏲️ **sleep timer** (15/30/60 menit atau akhir lagu)
-- ♥ **Favorit** & **riwayat putar** (disimpan di browser, tanpa akun)
-- 📁 **Putar file musik lokal** dari HP/komputer
-- 🔒 **Tetap jalan saat layar mati**, dengan kontrol di layar kunci (Media Session API)
-- 📲 **Bisa di-install** sebagai aplikasi (PWA) di Android & iPhone
-- 🪶 **Ringan**: tanpa framework, tanpa build
+- **Home** — quick picks, *Made for you*, your top artists, Indonesian charts, popular artists, *Because you played*
+- **Search** — songs and artists, recent searches, browse tiles; artist and playlist pages
+- **Smooth transitions** — the end of a song fades out while the next fades in (0–12 s, in Settings)
+- **Taste-based recommendations** — learns, on your device, which artists you finish and which songs you skip;
+  orders the autoplay radio and builds *Made for you*. Nothing is uploaded.
+- **Synced lyrics** — full-screen on phones, side by side on desktop; tap a line to jump (from LRCLIB / YouTube Music)
+- **Share to Instagram** — pick up to 5 lyric lines or the whole song, get a 9:16 Story card, send it via the share sheet
+- **Mix** — blend two songs with a crossfader, per-deck volume, bass and treble
+- Queue, shuffle, repeat, sleep timer, liked songs, history, downloads
+- **Local files** — pick or drag & drop MP3s; they never leave the device
+- **Lock-screen controls** and background playback (Media Session API)
+- **Installable** as an app (PWA) on Android, iPhone, Mac and Windows
+- **Phone and desktop layouts** — tab bar + mini player on phones; sidebar, queue/lyrics panel and a floating player bar from 1024 px
+- **Light on old phones** — no framework, no build step, translucent bars switch off automatically on weak devices
 
-<sub>* fitur mode server pribadi</sub>
+## Run it on your computer
 
-## Menjalankan di komputer sendiri
-
-Tidak perlu `npm install`. Cukup jalankan web server statis di folder `public/`:
+Web mode only (no YouTube Music):
 
 ```bash
 python3 -m http.server 8080 -d public
 ```
 
-Lalu buka <http://localhost:8080>. (Membuka `index.html` langsung lewat `file://`
-tidak akan jalan karena browser memblokir ES modules dari file lokal.)
+With the personal server (YouTube Music, lyrics, share cards) — see the
+[server guide](docs/SERVER-GUIDE.md):
 
-Untuk mencoba di HP pada jaringan Wi-Fi yang sama, buka `http://<IP-komputer>:8080`.
+```bash
+sh server/start.sh
+```
 
-## Deploy gratis (GitHub Pages)
+Then open <http://localhost:8080>.
 
-1. Buka **Settings → Pages** di repository ini.
-2. Pada **Source**, pilih **GitHub Actions**.
-3. Setiap push ke branch `main` akan otomatis ter-deploy oleh
-   [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+## Deploy for free (GitHub Pages)
 
-## Struktur kode
+1. **Settings → Pages → Source: GitHub Actions**.
+2. Every push to `main` is deployed by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+## Code layout
 
 ```
 public/
-├── index.html            # kerangka halaman + ikon SVG
-├── css/style.css         # tampilan (mobile-first, tanpa efek berat)
+├── index.html              # app shell
+├── css/style.css           # design tokens + phone & desktop layouts
+├── fonts/                  # DM Sans (SIL Open Font License)
 ├── js/
-│   ├── app.js            # UI: router #/..., halaman, mini player
-│   ├── player.js         # mesin pemutar: antrean, acak, ulangi, Media Session
-│   ├── store.js          # favorit, riwayat, pengaturan (localStorage)
-│   └── sources/
-│       ├── audius.js     # sumber musik indie (Audius API)
-│       ├── ytmusic.js    # sumber YouTube Music (lewat server pribadi)
-│       └── local.js      # sumber musik dari file perangkat
-├── sw.js                 # service worker (PWA, cache aplikasi)
-└── manifest.webmanifest  # metadata PWA
+│   ├── app.js              # routing, pages, Now Playing, lyrics, share flow, settings
+│   ├── player.js           # playback engine: queue, shuffle, repeat, crossfade, Media Session
+│   ├── taste.js            # on-device taste model (artist scores, skips, ranking)
+│   ├── share.js            # Instagram Story cards drawn on <canvas>
+│   ├── mix.js              # two-deck mixer (Web Audio API, loaded on demand)
+│   ├── i18n.js             # English (default) and Bahasa Indonesia
+│   ├── store.js            # liked songs, history, settings (localStorage)
+│   ├── ui.js               # DOM helper, icons, sheet, toast, skeletons
+│   └── sources/            # audius.js · ytmusic.js · local.js
+├── sw.js                   # service worker (installable, fast start)
+└── manifest.webmanifest
 server/
-├── projectmusic_server.py  # server pribadi: katalog (ytmusicapi) + audio (yt-dlp)
-├── requirements.txt
-└── start.sh / start.bat / start.command   # klik dua kali untuk menyalakan
+├── projectmusic_server.py  # personal server: catalogue (ytmusicapi) + audio (yt-dlp)
+└── start.sh / start.bat / start.command
+docs/
+├── SERVER-GUIDE.md · PANDUAN-SERVER.md
+├── desain/                 # design mockups
+└── logo-pilihan/           # logo concepts
 ```
 
-Setiap sumber musik mengembalikan objek **track** dengan bentuk yang sama
-(`id, title, artist, artwork, duration, streamUrl, ...`), jadi menambah sumber baru
-cukup dengan membuat file baru di `js/sources/`.
+## Credits
 
-## Roadmap (ide ke depan)
+Inspired by [BitChord](https://github.com/kushagrasinghx/BitChord) and [ytify](https://github.com/n-ce/ytify).
+Uses [ytmusicapi](https://github.com/sigma67/ytmusicapi), [yt-dlp](https://github.com/yt-dlp/yt-dlp),
+[LRCLIB](https://lrclib.net), [Audius](https://audius.org) and the [DM Sans](https://fonts.google.com/specimen/DM+Sans) typeface.
 
-- [ ] Playlist buatan sendiri (simpan, ubah nama, urutkan)
-- [ ] Simpan musik lokal di IndexedDB agar tidak hilang saat halaman ditutup
-- [ ] Baca tag ID3 (judul, artis, sampul) dari file lokal
-- [ ] Kecepatan putar, crossfade
-- [ ] Cache lagu untuk diputar offline
-- [ ] Ekspor/impor favorit (backup JSON)
-- [ ] Mode terang
+ProjectMusic is not affiliated with YouTube, Google, Instagram or Audius. Personal server mode
+accesses YouTube unofficially; using it is subject to YouTube's Terms of Service and is each
+user's own responsibility. Lyrics are fetched while a song plays and are never stored in this repository.
 
-## Terima kasih
+## License & governance
 
-Terinspirasi dari [BitChord](https://github.com/kushagrasinghx/BitChord) dan
-[ytify](https://github.com/n-ce/ytify). Memakai [ytmusicapi](https://github.com/sigma67/ytmusicapi),
-[yt-dlp](https://github.com/yt-dlp/yt-dlp), [LRCLIB](https://lrclib.net), dan [Audius](https://audius.org).
-
-ProjectMusic tidak berafiliasi dengan YouTube, Google, maupun Audius. Mode server pribadi
-mengakses YouTube secara tidak resmi; penggunaannya tunduk pada Ketentuan Layanan YouTube
-dan menjadi tanggung jawab masing-masing pengguna.
-
-## Lisensi & tata kelola
-
-Kode dirilis di bawah [lisensi MIT](LICENSE) © MahendraDharma.
-Proyek ini dikelola oleh satu maintainer — lihat [CONTRIBUTING.md](CONTRIBUTING.md).
+Code released under the [MIT License](LICENSE) © MahendraDharma.
+The project has a single maintainer — see [CONTRIBUTING.md](CONTRIBUTING.md).

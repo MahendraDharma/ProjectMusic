@@ -1,5 +1,7 @@
 # Panduan server pribadi ProjectMusic
 
+*English version: [SERVER-GUIDE.md](SERVER-GUIDE.md)*
+
 Server pribadi membuat ProjectMusic bisa memutar **lagu dari katalog YouTube Music**:
 tangga lagu Indonesia, pencarian, halaman artis, radio otomatis, lirik, dan unduh.
 
@@ -25,8 +27,11 @@ tangga lagu Indonesia, pencarian, halaman artis, radio otomatis, lirik, dan undu
 ### Mac
 1. Pasang **Python 3** dari <https://www.python.org/downloads/>.
 2. Unduh dan ekstrak ProjectMusic seperti di atas.
-3. Di folder `server`, **klik dua kali `start.command`**.
-   Kalau macOS menolak, klik kanan → **Open** → **Open**.
+3. Buka **Terminal**, lalu jalankan (sesuaikan lokasi foldernya):
+   ```bash
+   cd ~/Downloads/ProjectMusic-main && sh server/start.sh
+   ```
+   Atau klik dua kali `server/start.command` (kalau macOS menolak: klik kanan → **Open** → **Open**).
 4. Buka <http://localhost:8080>.
 
 ### Linux
@@ -85,7 +90,8 @@ Kalau server mati, link itu kembali ke musik indie Audius.
   di jaringan lokal?"*, pilih **Izinkan**.
 - **Safari** bisa memblokir sambungan dari situs HTTPS ke `localhost`. Kalau di Safari tetap
   muncul lagu Audius, buka `http://localhost:8080` saja, atau pakai Chrome.
-- Alamat server bisa diganti di **Koleksi → Server pribadi**.
+- Alamat server bisa diganti di **Pengaturan (ikon slider) → Alamat server**.
+- Bahasa aplikasi bisa diganti ke Bahasa Indonesia di **Pengaturan → Bahasa**.
 
 ## Kalau ada masalah
 
