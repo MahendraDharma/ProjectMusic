@@ -75,6 +75,18 @@ Lalu jadikan aplikasi:
 - **iPhone (Safari):** tombol Share → **Add to Home Screen**.
 - **Android (Chrome):** menu ⋮ → **Tambahkan ke layar utama**.
 
+## 4. Memakai link GitHub (tanpa mengetik localhost)
+
+Saat server menyala, link **https://mahendradharma.github.io/ProjectMusic/** di perangkat
+yang sama otomatis tersambung ke server dan menampilkan lagu YouTube Music.
+Kalau server mati, link itu kembali ke musik indie Audius.
+
+- Pakai **Chrome, Edge, atau Firefox**. Kalau muncul pertanyaan *"izinkan mengakses perangkat
+  di jaringan lokal?"*, pilih **Izinkan**.
+- **Safari** bisa memblokir sambungan dari situs HTTPS ke `localhost`. Kalau di Safari tetap
+  muncul lagu Audius, buka `http://localhost:8080` saja, atau pakai Chrome.
+- Alamat server bisa diganti di **Koleksi → Server pribadi**.
+
 ## Kalau ada masalah
 
 | Gejala | Solusi |
