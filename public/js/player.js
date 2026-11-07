@@ -99,6 +99,23 @@ class Player extends EventTarget {
     this._changed();
   }
 
+  /** Tambah banyak lagu sekaligus di akhir antrean (dipakai radio otomatis). */
+  appendMany(tracks) {
+    const known = new Set(this.queue.map((t) => t.id));
+    for (const t of tracks) {
+      if (known.has(t.id)) continue;
+      known.add(t.id);
+      this.queue.push(t);
+      this.order.push(this.queue.length - 1);
+    }
+    this._changed();
+  }
+
+  /** Sisa lagu setelah yang sedang diputar. */
+  get remaining() {
+    return this.order.length - 1 - this.pos;
+  }
+
   playNext(track) {
     if (this.pos < 0) return this.addToQueue(track);
     this.queue.push(track);

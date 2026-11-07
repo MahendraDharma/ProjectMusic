@@ -10,23 +10,32 @@ Terinspirasi dari [BitChord](https://github.com/kushagrasinghx/BitChord) (aplika
 Android). Bedanya, ProjectMusic dibangun untuk web dan hanya memakai sumber musik
 yang legal untuk di-*stream* gratis.
 
+## Dua cara pakai
+
+| | **Mode web** (GitHub Pages) | **Mode server pribadi** |
+|---|---|---|
+| Cara buka | Langsung buka link | Jalankan server di laptop/HP Android sendiri |
+| Katalog lagu | Musik indie dari [Audius](https://audius.org) | **YouTube Music**: tangga lagu Indonesia, semua artis populer |
+| Lirik, radio otomatis, unduh | ❌ | ✅ |
+| Untuk siapa | Siapa saja | **Pemakaian pribadi** |
+
+👉 **Panduan server pribadi (bahasa Indonesia):** [docs/PANDUAN-SERVER.md](docs/PANDUAN-SERVER.md)
+
 ## Fitur
 
-- 🔥 **Trending** dengan filter genre, dan 🔍 **pencarian** lagu/artis
-- ▶️ Antrean, **acak**, **ulangi** (semua / satu lagu), lompat ke lagu mana pun di antrean
+- 🔥 Beranda: **Trending 20 Indonesia**, Top Music Videos, artis populer, dan rekomendasi dari lagu terakhir*
+- 🔍 Pencarian lagu & artis, **halaman artis***
+- 📻 **Radio otomatis**: antrean tidak pernah habis, terus disambung lagu yang mirip*
+- 🎤 **Lirik tersinkron** dengan lagu (dari LRCLIB / YouTube Music), ketuk baris untuk lompat*
+- ⬇️ **Unduh** lagu untuk disimpan*
+- ▶️ Antrean, **acak**, **ulangi**, ⏲️ **sleep timer** (15/30/60 menit atau akhir lagu)
 - ♥ **Favorit** & **riwayat putar** (disimpan di browser, tanpa akun)
-- 📁 **Putar file musik lokal** dari HP/komputer — tidak diunggah ke mana pun
-- 🔒 **Kontrol di layar kunci/notifikasi** (Media Session API) & tetap jalan di latar belakang
-- 📲 **Bisa di-install** sebagai aplikasi (PWA) dan dibuka dari layar utama
-- 🪶 **Super ringan**: tanpa framework, tanpa build, total kode ±50 KB
+- 📁 **Putar file musik lokal** dari HP/komputer
+- 🔒 **Tetap jalan saat layar mati**, dengan kontrol di layar kunci (Media Session API)
+- 📲 **Bisa di-install** sebagai aplikasi (PWA) di Android & iPhone
+- 🪶 **Ringan**: tanpa framework, tanpa build
 
-## Dari mana musiknya?
-
-Musik streaming diambil dari **[Audius](https://audius.org)** — platform musik terbuka
-tempat musisi independen membagikan karyanya. API-nya publik, gratis, dan tidak butuh
-API key. Setiap lagu punya tautan ke halaman artisnya di Audius — dukung mereka!
-
-> ProjectMusic tidak berafiliasi dengan Audius.
+<sub>* fitur mode server pribadi</sub>
 
 ## Menjalankan di komputer sendiri
 
@@ -59,10 +68,15 @@ public/
 │   ├── player.js         # mesin pemutar: antrean, acak, ulangi, Media Session
 │   ├── store.js          # favorit, riwayat, pengaturan (localStorage)
 │   └── sources/
-│       ├── audius.js     # sumber musik online (Audius API)
+│       ├── audius.js     # sumber musik indie (Audius API)
+│       ├── ytmusic.js    # sumber YouTube Music (lewat server pribadi)
 │       └── local.js      # sumber musik dari file perangkat
 ├── sw.js                 # service worker (PWA, cache aplikasi)
 └── manifest.webmanifest  # metadata PWA
+server/
+├── projectmusic_server.py  # server pribadi: katalog (ytmusicapi) + audio (yt-dlp)
+├── requirements.txt
+└── start.sh / start.bat / start.command   # klik dua kali untuk menyalakan
 ```
 
 Setiap sumber musik mengembalikan objek **track** dengan bentuk yang sama
@@ -72,13 +86,22 @@ cukup dengan membuat file baru di `js/sources/`.
 ## Roadmap (ide ke depan)
 
 - [ ] Playlist buatan sendiri (simpan, ubah nama, urutkan)
-- [ ] Sumber tambahan: [Jamendo](https://developer.jamendo.com) (Creative Commons), [Internet Archive](https://archive.org/details/audio)
 - [ ] Simpan musik lokal di IndexedDB agar tidak hilang saat halaman ditutup
 - [ ] Baca tag ID3 (judul, artis, sampul) dari file lokal
-- [ ] Lirik dari [LRCLIB](https://lrclib.net) (gratis, tanpa key)
-- [ ] Sleep timer, kecepatan putar, crossfade
+- [ ] Kecepatan putar, crossfade
+- [ ] Cache lagu untuk diputar offline
 - [ ] Ekspor/impor favorit (backup JSON)
 - [ ] Mode terang
+
+## Terima kasih
+
+Terinspirasi dari [BitChord](https://github.com/kushagrasinghx/BitChord) dan
+[ytify](https://github.com/n-ce/ytify). Memakai [ytmusicapi](https://github.com/sigma67/ytmusicapi),
+[yt-dlp](https://github.com/yt-dlp/yt-dlp), [LRCLIB](https://lrclib.net), dan [Audius](https://audius.org).
+
+ProjectMusic tidak berafiliasi dengan YouTube, Google, maupun Audius. Mode server pribadi
+mengakses YouTube secara tidak resmi; penggunaannya tunduk pada Ketentuan Layanan YouTube
+dan menjadi tanggung jawab masing-masing pengguna.
 
 ## Lisensi & tata kelola
 

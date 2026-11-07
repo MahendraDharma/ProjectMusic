@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#121212">
+  <!-- Jangan kirim alamat halaman ke server gambar/lagu pihak lain (privasi + mencegah gambar ditolak) -->
+  <meta name="referrer" content="no-referrer">
   <meta name="description" content="ProjectMusic — pemutar musik web gratis, ringan, dan open source.">
   <title>ProjectMusic</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -76,6 +78,12 @@
       <button id="np-next" class="icon-btn big" aria-label="Berikutnya"><svg class="ic"><use href="#i-next"/></svg></button>
       <button id="np-repeat" class="icon-btn" aria-label="Ulangi"><svg class="ic"><use href="#i-repeat"/></svg></button>
     </div>
+    <div class="np-extra">
+      <button id="np-lyrics-btn" class="pill" hidden>Lirik</button>
+      <a id="np-download" class="pill" hidden download>Unduh</a>
+      <button id="np-sleep" class="pill">Sleep: mati</button>
+    </div>
+    <div id="np-lyrics" class="lyrics" hidden aria-live="off"></div>
     <p id="np-source" class="np-source"></p>
   </section>
 

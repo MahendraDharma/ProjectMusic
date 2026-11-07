@@ -4,6 +4,10 @@ import { player } from './player.js';
 import { favs, history as recents, prefs } from './store.js';
 import * as audius from './sources/audius.js';
 import * as local from './sources/local.js';
+import * as ytmusic from './sources/ytmusic.js';
+
+// Diisi saat start: info server pribadi kalau halaman dibuka dari server ProjectMusic.
+let server = null;
 
 const $ = (id) => document.getElementById(id);
 const view = $('view');
@@ -110,11 +114,63 @@ function errorState(err, retry) {
   );
 }
 
+/* ---------- Komponen beranda ---------- */
+function section(title, tracks, fullList) {
+  const all = fullList || tracks;
+  return h('section', {},
+    h('div', { class: 'section-head' },
+      h('h2', {}, title),
+      h('button', { class: 'pill', onclick: () => player.playList(all, 0) }, 'Putar')),
+    trackList(tracks, { onPlay: (i) => player.playList(all, i) }),
+  );
+}
+
+function artistRow(artists) {
+  return h('div', { class: 'artists' },
+    artists.map((a) => h('a', { class: 'artist-card', href: '#/artist?id=' + encodeURIComponent(a.id) },
+      a.artwork ? h('img', { src: a.artwork, alt: '', loading: 'lazy' }) : h('span', { class: 'art-ph' }, icon('note')),
+      h('span', {}, a.name))));
+}
+
 /* ---------- Halaman ---------- */
 let pageAbort;
 
 const pages = {
   async home() {
+    if (!server) return pages.indie();
+    const box = h('div', {}, loading());
+    const recent = recents.all().filter((t) => t.source === 'ytmusic');
+
+    const load = async () => {
+      pageAbort?.abort();
+      pageAbort = new AbortController();
+      const signal = pageAbort.signal;
+      box.replaceChildren(loading());
+      try {
+        const [data, radio] = await Promise.all([
+          ytmusic.home(signal),
+          // "Untukmu": radio dari lagu terakhir yang diputar, seperti Quick picks
+          recent[0] ? ytmusic.next(recent[0].videoId, signal).catch(() => []) : [],
+        ]);
+        box.replaceChildren(...[
+          radio.length ? section(`Karena kamu memutar ${recent[0].title}`, radio.slice(0, 10)) : null,
+          data.artists?.length ? h('section', {}, h('h2', {}, 'Artis populer'), artistRow(data.artists)) : null,
+          ...data.sections.map((sec) => section(sec.title, sec.tracks.slice(0, 20), sec.tracks)),
+        ].filter(Boolean));
+      } catch (err) {
+        if (err.name !== 'AbortError') box.replaceChildren(errorState(err, load));
+      }
+    };
+
+    show(
+      recent.length ? h('section', {}, h('h2', {}, 'Terakhir diputar'), trackList(recent.slice(0, 4))) : null,
+      box,
+      h('p', { class: 'hint' }, h('a', { href: '#/indie' }, 'Jelajahi musik indie dari Audius →')),
+    );
+    load();
+  },
+
+  async indie() {
     let genre = sessionStorage.getItem('pm:genre') || '';
     const listBox = h('div', {}, loading());
     const chips = h('div', { class: 'chips' });
@@ -169,8 +225,16 @@ const pages = {
       pageAbort = new AbortController();
       results.replaceChildren(loading());
       try {
-        const tracks = await audius.search(term.trim(), pageAbort.signal);
-        results.replaceChildren(tracks.length ? trackList(tracks) : h('p', { class: 'state' }, 'Tidak ada hasil.'));
+        if (server) {
+          const data = await ytmusic.search(term.trim(), pageAbort.signal);
+          results.replaceChildren(...[
+            data.artists.length ? artistRow(data.artists) : null,
+            data.tracks.length ? trackList(data.tracks) : h('p', { class: 'state' }, 'Tidak ada hasil.'),
+          ].filter(Boolean));
+        } else {
+          const tracks = await audius.search(term.trim(), pageAbort.signal);
+          results.replaceChildren(tracks.length ? trackList(tracks) : h('p', { class: 'state' }, 'Tidak ada hasil.'));
+        }
       } catch (err) {
         if (err.name !== 'AbortError') results.replaceChildren(errorState(err, () => run(term)));
       }
@@ -188,6 +252,49 @@ const pages = {
     show(h('h1', {}, 'Cari'), input, results);
     run(q);
     if (!q) input.focus();
+  },
+
+  async artist(params) {
+    const id = params.get('id');
+    if (!server || !id) return pages.home();
+    show(loading());
+    pageAbort?.abort();
+    pageAbort = new AbortController();
+    try {
+      const a = await ytmusic.artist(id, pageAbort.signal);
+      show(
+        h('div', { class: 'artist-hero' },
+          a.artwork ? h('img', { src: a.artwork, alt: '' }) : null,
+          h('div', {}, h('h1', {}, a.name || 'Artis'), h('span', { class: 'badge' }, `${a.tracks.length} lagu`))),
+        a.tracks.length
+          ? h('div', { class: 'row-actions' },
+              h('button', { class: 'btn primary', onclick: () => player.playList(a.tracks, 0) }, icon('play'), 'Putar'),
+              h('button', { class: 'btn', onclick: () => { if (!player.shuffle) player.toggleShuffle(); player.playList(a.tracks, Math.floor(Math.random() * a.tracks.length)); } }, icon('shuffle'), 'Acak'))
+          : null,
+        trackList(a.tracks),
+      );
+    } catch (err) {
+      if (err.name !== 'AbortError') show(errorState(err, render));
+    }
+  },
+
+  async playlist(params) {
+    const id = params.get('id');
+    if (!server || !id) return pages.home();
+    show(loading());
+    pageAbort?.abort();
+    pageAbort = new AbortController();
+    try {
+      const pl = await ytmusic.playlist(id, pageAbort.signal);
+      show(
+        h('h1', {}, pl.title || 'Playlist'),
+        h('div', { class: 'row-actions' },
+          h('button', { class: 'btn primary', onclick: () => player.playList(pl.tracks, 0) }, icon('play'), 'Putar semua')),
+        trackList(pl.tracks),
+      );
+    } catch (err) {
+      if (err.name !== 'AbortError') show(errorState(err, render));
+    }
   },
 
   library() {
@@ -215,6 +322,16 @@ const pages = {
           onchange: (e) => { prefs.set('dataSaver', e.target.checked); syncNowPlaying(); },
         }),
       ),
+      h('label', { class: 'setting' },
+        h('span', {}, 'Radio otomatis', h('small', {}, 'Saat antrean hampir habis, tambahkan lagu yang mirip.')),
+        h('input', {
+          type: 'checkbox', checked: prefs.get('autoRadio') !== false,
+          onchange: (e) => prefs.set('autoRadio', e.target.checked),
+        }),
+      ),
+      h('p', { class: 'hint' }, server
+        ? `Tersambung ke server pribadi ProjectMusic ${server.version} (YouTube Music, negara ${server.country}).`
+        : 'Mode web saja (musik indie dari Audius). Untuk lagu YouTube Music, jalankan server pribadi — lihat panduan di README.'),
       h('p', { class: 'hint' }, 'Data favorit & riwayat hanya disimpan di browser ini.'),
     );
   },
@@ -262,7 +379,8 @@ function render() {
   const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
   const name = pages[path] ? path : 'home';
   currentPage = name;
-  document.querySelectorAll('.tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.tab === name));
+  const tab = { artist: 'search', playlist: 'home', indie: 'home' }[name] || name;
+  document.querySelectorAll('.tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
   pages[name](new URLSearchParams(query));
 }
 
@@ -295,9 +413,16 @@ function syncNowPlaying() {
   setIcon($('np-repeat'), player.repeat === 'one' ? 'repeat-one' : 'repeat');
 
   const src = $('np-source');
-  src.replaceChildren(t.source === 'audius' && t.link
-    ? h('a', { href: t.link, target: '_blank', rel: 'noopener' }, 'Lihat di Audius — dukung artisnya')
+  src.replaceChildren(
+    t.source === 'audius' && t.link ? h('a', { href: t.link, target: '_blank', rel: 'noopener' }, 'Lihat di Audius — dukung artisnya')
+    : t.source === 'ytmusic' ? h('a', { href: t.link, target: '_blank', rel: 'noopener' }, 'Buka di YouTube Music')
     : t.source === 'local' ? 'File lokal' : '');
+
+  const dl = $('np-download');
+  dl.hidden = t.source !== 'ytmusic';
+  if (!dl.hidden) dl.href = ytmusic.downloadUrl(t);
+  $('np-lyrics-btn').hidden = !server || t.source === 'local';
+  if (lyricsFor !== t.id) { lyricsFor = null; if (!$('np-lyrics').hidden) loadLyrics(); }
 
   // Tandai lagu yang sedang diputar di daftar yang terlihat.
   view.querySelectorAll('.track').forEach((li) => li.classList.toggle('playing', li.dataset.id === t.id));
@@ -315,6 +440,102 @@ function syncTime() {
     $('np-seek').value = Math.round(ratio * 1000);
     $('np-cur').textContent = fmt(a.currentTime);
   }
+  highlightLyrics(a.currentTime);
+}
+
+/* ---------- Lirik (diambil saat dibutuhkan dari server pribadi) ---------- */
+let lyricsFor = null;
+let lyricLines = [];
+let lyricIndex = -1;
+
+async function loadLyrics() {
+  const t = player.current;
+  const box = $('np-lyrics');
+  if (!t || !server) return;
+  lyricsFor = t.id;
+  lyricLines = [];
+  lyricIndex = -1;
+  box.className = 'lyrics';
+  box.replaceChildren(h('p', {}, 'Mencari lirik…'));
+  try {
+    const data = await ytmusic.lyrics(t);
+    if (lyricsFor !== t.id) return; // lagu sudah berganti
+    const credit = data.source ? h('small', {}, 'Sumber lirik: ' + data.source) : null;
+    if (data.synced?.length) {
+      lyricLines = data.synced;
+      box.replaceChildren(...data.synced.map((l, i) =>
+        h('p', { 'data-i': i, onclick: () => player.seek(l.t) }, l.text || '♪')), credit || '');
+    } else if (data.plain) {
+      box.classList.add('plain');
+      box.replaceChildren(data.plain, credit || '');
+    } else {
+      box.replaceChildren(h('p', {}, 'Lirik tidak ditemukan.'));
+    }
+  } catch {
+    if (lyricsFor === t.id) box.replaceChildren(h('p', {}, 'Gagal memuat lirik.'));
+  }
+}
+
+function highlightLyrics(time) {
+  if (!lyricLines.length || $('np-lyrics').hidden) return;
+  let i = lyricLines.length - 1;
+  while (i >= 0 && lyricLines[i].t > time + 0.25) i--;
+  if (i === lyricIndex) return;
+  const box = $('np-lyrics');
+  box.querySelector('p.now')?.classList.remove('now');
+  lyricIndex = i;
+  const el = i >= 0 && box.querySelector(`p[data-i="${i}"]`);
+  if (el) {
+    el.classList.add('now');
+    box.scrollTo({ top: el.offsetTop - box.clientHeight / 3, behavior: 'smooth' });
+  }
+}
+
+$('np-lyrics-btn').addEventListener('click', () => {
+  const box = $('np-lyrics');
+  box.hidden = !box.hidden;
+  np.classList.toggle('show-lyrics', !box.hidden);
+  $('np-lyrics-btn').classList.toggle('on', !box.hidden);
+  if (!box.hidden && lyricsFor !== player.current?.id) loadLyrics();
+});
+
+/* ---------- Sleep timer ---------- */
+const SLEEP_STEPS = [0, 15, 30, 60, -1]; // menit; -1 = setelah lagu ini selesai
+let sleepStep = 0;
+let sleepTimer = null;
+
+function setSleep(step) {
+  sleepStep = step;
+  clearTimeout(sleepTimer);
+  sleepTimer = null;
+  const v = SLEEP_STEPS[step];
+  const btn = $('np-sleep');
+  btn.classList.toggle('on', v !== 0);
+  btn.textContent = v === 0 ? 'Sleep: mati' : v === -1 ? 'Sleep: akhir lagu' : `Sleep: ${v} mnt`;
+  if (v > 0) sleepTimer = setTimeout(() => { player.audio.pause(); setSleep(0); toast('Sleep timer: musik dihentikan'); }, v * 60000);
+}
+$('np-sleep').addEventListener('click', () => setSleep((sleepStep + 1) % SLEEP_STEPS.length));
+player.audio.addEventListener('ended', () => {
+  if (SLEEP_STEPS[sleepStep] === -1) {
+    setSleep(0);
+    // player otomatis lanjut ke lagu berikutnya; hentikan segera.
+    setTimeout(() => player.audio.pause(), 0);
+    toast('Sleep timer: musik dihentikan');
+  }
+});
+
+/* ---------- Radio otomatis: antrean tidak pernah habis (seperti YouTube Music) ---------- */
+let radioBusy = false;
+async function fillRadio() {
+  const t = player.current;
+  if (!server || radioBusy || !t || t.source !== 'ytmusic' || prefs.get('autoRadio') === false) return;
+  if (player.remaining > 2) return;
+  radioBusy = true;
+  try {
+    const more = await ytmusic.next(t.videoId);
+    if (more.length) player.appendMany(more.slice(0, 20));
+  } catch { /* coba lagi di lagu berikutnya */ }
+  finally { radioBusy = false; }
 }
 
 function openNowPlaying() {
@@ -363,7 +584,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape') np.hidden = true;
 });
 
-player.addEventListener('state', syncNowPlaying);
+player.addEventListener('state', () => { syncNowPlaying(); fillRadio(); });
 player.addEventListener('time', syncTime);
 player.addEventListener('queue', () => { if (currentPage === 'queue') render(); });
 player.addEventListener('error', (e) => toast(e.detail.message));
@@ -371,8 +592,11 @@ player.addEventListener('error', (e) => toast(e.detail.message));
 window.addEventListener('hashchange', () => { np.hidden = true; render(); view.focus({ preventScroll: true }); window.scrollTo(0, 0); });
 window.addEventListener('offline', () => toast('Kamu sedang offline'));
 
-render();
-syncNowPlaying();
+ytmusic.detect().then((info) => {
+  server = info;
+  render();
+  syncNowPlaying();
+});
 
 // Service worker → aplikasi bisa di-"install" & dibuka lebih cepat (PWA).
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

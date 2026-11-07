@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi (HTML/CSS/JS) agar terbuka cepat & bisa
 // di-install. Request ke API/audio (domain lain) tidak disentuh — selalu langsung ke jaringan.
-const VERSION = 'pm-v1';
+const VERSION = 'pm-v2';
 const SHELL = [
   './',
   'index.html',
@@ -10,6 +10,7 @@ const SHELL = [
   'js/store.js',
   'js/sources/audius.js',
   'js/sources/local.js',
+  'js/sources/ytmusic.js',
   'icons/icon.svg',
   'manifest.webmanifest',
 ];
@@ -31,7 +32,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  // API & audio dari server pribadi tidak boleh di-cache (audio memakai Range request).
+  if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.includes('/api/')) return;
   e.respondWith(
     fetch(req)
       .then((res) => {
