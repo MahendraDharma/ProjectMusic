@@ -43,7 +43,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -155,6 +155,30 @@ def _art(thumbs, size: int) -> str:
     return url
 
 
+_NOISE = re.compile(
+    r"\s*[\(\[][^)\]]*(official|lyric|lirik|video|audio|live|mv|visualizer|music video)[^)\]]*[\)\]]",
+    re.I,
+)
+
+
+def clean_title(title: str, artist: str) -> str:
+    """Rapikan judul gaya YouTube: buang "(Official Video)", nama artis di depan/belakang,
+    dan ubah judul HURUF BESAR SEMUA menjadi Title Case."""
+    t = _NOISE.sub("", title or "").strip()
+    first = (artist or "").split(",")[0].strip().lower()
+    m = re.match(r"^(.+?)\s+[-\u2013\u2014|]\s+(.+)$", t)
+    if m and first:
+        left, right = m.group(1).strip(), m.group(2).strip()
+        if first in left.lower():
+            t = right
+        elif first in right.lower():
+            t = left
+    t = t.strip(" -|")
+    if len(t) > 4 and t.upper() == t and any(c.isalpha() for c in t):
+        t = t.title()
+    return t or (title or "")
+
+
 def track(item: dict) -> dict | None:
     vid = item.get("videoId")
     if not vid:
@@ -168,8 +192,9 @@ def track(item: dict) -> dict | None:
         "id": "yt:" + vid,
         "videoId": vid,
         "source": "ytmusic",
-        "title": item.get("title") or "Tanpa judul",
-        "artist": artist or "Tidak diketahui",
+        "title": clean_title(item.get("title") or "", artist) or "Untitled",
+        "rawTitle": item.get("title") or "",
+        "artist": artist or "Unknown artist",
         "album": album.get("name") if isinstance(album, dict) else None,
         "artwork": _art(thumbs, 120),
         "artworkLarge": _art(thumbs, 544),
@@ -471,6 +496,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/stream":
                 return self._stream(query)
+            if path == "/api/image":
+                return self._image(query)
             if path in API:
                 return self._send_json(200, API[path](query))
             if path.startswith("/api/"):
@@ -486,6 +513,29 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(502, {"error": "Gagal mengambil data dari YouTube Music.", "detail": str(e)[:300]})
             except Exception:
                 pass
+
+    # ---- gambar sampul (untuk kartu share di <canvas>) ------------------- #
+    def _image(self, query):
+        url = (query.get("url") or [""])[0]
+        host = urllib.parse.urlparse(url).hostname or ""
+        if not url.startswith("https://") or not (
+            host == "i.ytimg.com" or host.endswith(".googleusercontent.com") or host.endswith(".ggpht.com")
+        ):
+            raise ValueError("Alamat gambar tidak diizinkan")
+        cached_img = cache.get("img:" + url)
+        if cached_img is None:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urlopen(req, timeout=10) as r:
+                cached_img = (r.headers.get("Content-Type") or "image/jpeg", r.read(3_000_000))
+            cache.set("img:" + url, cached_img, 3600)
+        ctype, data = cached_img
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     # ---- file statis (tampilan web) ------------------------------------- #
     def _static(self, path: str):
