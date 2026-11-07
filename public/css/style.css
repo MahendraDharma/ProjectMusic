@@ -1,12 +1,12 @@
 /* ProjectMusic — gaya dibuat sederhana: tanpa blur/shadow berat agar ringan di HP lama. */
 :root {
-  --bg: #121212;
+  --bg: #111315;
   --surface: #1c1c1c;
   --surface-2: #262626;
   --text: #f2f2f2;
   --muted: #a0a0a0;
-  --accent: #1ed760;
-  --accent-ink: #0b0b0b;
+  --accent: #ff375f;   /* warna titik logo "p." ProjectMusic */
+  --accent-ink: #1a0207;
   --danger: #ff6b6b;
   --tabbar-h: 58px;
   --mini-h: 62px;
@@ -37,7 +37,7 @@ img { display: block; }
   background: var(--bg);
 }
 .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
-.brand .ic { color: var(--accent); }
+.brand img { border-radius: 7px; }
 
 .view {
   padding: 0 16px calc(var(--tabbar-h) + var(--mini-h) + 24px);
