@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="116" fill="#e9fbf7"/>
-  <!-- not musik yang benderanya berupa bulu: ringan -->
-  <ellipse cx="196" cy="360" rx="70" ry="54" transform="rotate(-22 196 360)" fill="#0b7a6b"/>
-  <rect x="246" y="118" width="26" height="246" rx="13" fill="#0b7a6b"/>
-  <path d="M272 120 C352 132 404 196 392 286 C372 236 330 214 272 214 Z" fill="#19b39c"/>
-  <path d="M278 140 C330 160 362 200 372 246" fill="none" stroke="#e9fbf7" stroke-width="8" stroke-linecap="round"/>
-</svg>
