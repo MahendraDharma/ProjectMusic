@@ -1,0 +1,49 @@
+/* Tata letak layar lebar (Mac/Windows): sidebar · konten · panel antrean/lirik · bilah pemutar */
+.win{width:1440px;border-radius:12px;overflow:hidden;box-shadow:0 40px 80px -30px rgba(0,0,0,.8),0 0 0 1px var(--line);background:var(--deep)}
+.chrome{height:36px;display:flex;align-items:center;gap:8px;padding:0 14px;background:var(--deep);color:var(--ink3);font-size:12px}
+.chrome i{width:12px;height:12px;border-radius:50%;background:#3a3c41}.chrome span{margin-left:auto;margin-right:auto;padding-right:60px}
+.app{display:grid;grid-template-columns:248px 1fr 320px;grid-template-rows:776px 88px;gap:8px;padding:0 8px 0;height:872px}
+.side,.main,.panel{background:var(--bg);border-radius:10px;overflow:hidden}
+/* sidebar */
+.side{padding:18px 12px;display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 18px}.brand img{width:30px;height:30px;border-radius:8px;background:none}.brand b{font-weight:500;font-size:17px}
+.side>a{display:flex;align-items:center;gap:14px;height:42px;padding:0 10px;border-radius:8px;color:var(--ink2);font-weight:500;font-size:15px}
+.side>a.on{color:var(--ink);background:var(--card)}
+.side h4{font-weight:500;font-size:13px;color:var(--ink3);margin:22px 10px 8px}
+.side a.lib{height:60px;gap:12px}.side a.lib b{display:block;color:var(--ink);font-weight:500;font-size:14px}.side a.lib small{color:var(--ink3);font-size:12px}
+.side .lt{width:44px;height:44px;border-radius:6px;background:var(--raised);display:grid;place-items:center;color:var(--ink2);flex:none}
+.side .lt.fav{background:linear-gradient(135deg,#ff375f,#8a1630);color:#fff}
+.side .srv{margin-top:auto;display:flex;gap:10px;align-items:center;padding:12px;border-radius:10px;background:var(--card);font-size:13px;font-weight:500}
+.side .srv i{width:8px;height:8px;border-radius:50%;background:#30D158}.side .srv small{display:block;color:var(--ink3);font-weight:400}
+/* konten */
+.main{padding:16px 28px;overflow:hidden;background:linear-gradient(180deg,#2a1c21 0,var(--bg) 280px)}
+.mtop{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.nav{display:flex;gap:6px}.nav button{width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.35);display:grid;place-items:center;color:var(--ink2)}
+.main .field{flex:1;max-width:420px;height:40px;margin:0;border-radius:999px;background:var(--raised)}.field kbd{margin-left:auto;font:500 11px "DM Sans";color:var(--ink3);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.mtop .ib{margin-left:auto}
+.main h1{font-weight:500;font-size:30px;letter-spacing:-.02em;margin-bottom:16px}
+.main .qgrid{grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:30px}
+.qp{position:relative;height:60px}.qp img{width:60px;height:60px}.qp .pp{position:absolute;right:10px;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;opacity:0}
+.qp:nth-child(2) .pp{opacity:1}.qp:nth-child(2){background:var(--raised)}
+.cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:18px;margin-bottom:30px}
+.cards .card,.cards .art{width:auto;min-width:0}.cards .card img,.cards .art img{width:100%;height:auto;aspect-ratio:1/1;object-fit:cover}
+.cards .art{text-align:left}.cards .art img{border-radius:50%}.cards .art small{color:var(--ink2);font-size:13px}
+.cards .art:nth-child(7){display:none}
+/* panel kanan */
+.panel{padding:16px 18px;overflow:hidden}
+.ptabs{display:flex;gap:6px;margin-bottom:16px}.ptabs span{height:30px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;background:var(--raised);font-size:13px;font-weight:500}
+.ptabs span.on{background:var(--ink);color:var(--bg)}
+.pbig{width:100%;aspect-ratio:1;border-radius:10px}.panel h3{font-weight:500;font-size:20px;margin-top:14px}.panel p{color:var(--ink2)}
+.panel h4{font-weight:500;font-size:13px;color:var(--ink3);margin:18px 0 6px}
+.qr{display:flex;align-items:center;gap:10px;height:52px;padding:0 6px;margin:0 -6px;border-radius:6px}.qr.now{background:var(--card)}.qr.now b{color:var(--accent)}
+.qr img{width:40px;height:40px;border-radius:4px}.qr span{flex:1;min-width:0}.qr b,.qr small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qr b{font-weight:500;font-size:14px}.qr small{color:var(--ink2);font-size:12px}.qr em{font-style:normal;color:var(--ink3);font-size:12px;font-variant-numeric:tabular-nums}
+/* bilah pemutar */
+.bar{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.3fr 1fr;align-items:center;padding:0 12px;background:var(--deep)}
+.bnow{display:flex;align-items:center;gap:12px}.bnow img{width:56px;height:56px;border-radius:6px}.bnow b{display:block;font-weight:500;font-size:14px}.bnow small{color:var(--ink2);font-size:12px}
+.bmid{display:flex;flex-direction:column;align-items:center;gap:4px}.bctl{display:flex;align-items:center;gap:8px}
+.bplay{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;margin:0 6px}
+.bseek{display:flex;align-items:center;gap:10px;width:100%;max-width:560px}.bseek em{font-style:normal;font-size:11px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.bseek .seek{flex:1;height:4px}
+.bright{display:flex;align-items:center;justify-content:flex-end;gap:2px;color:var(--ink2)}
+.vol{width:96px;height:4px;border-radius:4px;background:rgba(237,238,240,.22);margin-left:8px;position:relative}.vol i{position:absolute;inset:0 auto 0 0;background:var(--ink);border-radius:4px}
