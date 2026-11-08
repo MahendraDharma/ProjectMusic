@@ -56,18 +56,17 @@ class Player extends EventTarget {
     return !!a.getAttribute('src') && !a.paused && a.readyState < 3;
   }
   /**
-   * Length of the current song in seconds. Safari sometimes misreads streamed audio
-   * (e.g. a 4:50 song shown as 9:39), so when the catalogue length disagrees clearly
-   * with what the browser reports, trust the catalogue.
+   * Length of the current song in seconds, as YouTube Music lists it. Browsers (Safari
+   * especially) can misread streamed audio, so their own reading is only used when there
+   * is no catalogue length at all (e.g. local files).
    */
   get duration() {
-    const d = this.audio.duration;
     const known = this.current?.duration || 0;
-    const ok = Number.isFinite(d) && d > 0;
-    // Only when the browser says *longer*: a shorter file still ends on its own.
-    if (known > 0 && (!ok || d - known > Math.max(8, known * 0.15))) return known;
-    return ok ? d : 0;
+    if (known > 0) return known;
+    const d = this.audio.duration;
+    return Number.isFinite(d) && d > 0 ? d : 0;
   }
+
   get volume() {
     return this._volume;
   }
@@ -223,11 +222,11 @@ class Player extends EventTarget {
     for (const ev of ['loadstart', 'waiting', 'play', 'playing', 'canplay', 'pause', 'error', 'emptied']) {
       a.addEventListener(ev, () => a === this.audio && this._emit('loading'));
     }
-    a.addEventListener('loadedmetadata', () => {
+    a.addEventListener('loadedmetadata', () => a === this.audio && this._emit('time'));
+    a.addEventListener('loadstart', () => {
       if (a !== this.audio) return;
-      this._emit('time');
-      // No length in our data (e.g. some imported songs)? Ask for it, so a browser that
-      // misreads the stream (Safari) can't stretch the bar past the end of the song.
+      // No length in our data (e.g. some imported songs)? Ask YouTube's length right away,
+      // so a browser that misreads the stream (Safari) can't stretch the bar.
       const tr = this.current;
       if (tr && !tr.duration && this.lookupDuration) {
         this.lookupDuration(tr).then((d) => {

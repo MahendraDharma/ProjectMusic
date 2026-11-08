@@ -180,7 +180,7 @@ export function renderImport(view, { server, artEl, go, serverNotice, back }) {
         if (signal.aborted) return;
         // Keep the name the person knows from the other app; play the YouTube Music audio.
         const want = list.tracks[i];
-        if (tr) tr = { ...tr, title: want.title || tr.title, artist: want.artist || tr.artist, duration: tr.duration || want.duration || 0 };
+        if (tr) tr = { ...tr, title: want.title || tr.title, artist: want.artist || tr.artist };  // length stays YouTube's; the player looks it up if missing
         found[i] = tr;
         show(i, tr);
         done++;
