@@ -50,6 +50,11 @@ class Player extends EventTarget {
   get playing() {
     return !this.audio.paused;
   }
+  /** True while a song should be playing but no sound has arrived yet. */
+  get loading() {
+    const a = this.audio;
+    return !!a.getAttribute('src') && !a.paused && a.readyState < 3;
+  }
   /**
    * Length of the current song in seconds. Safari sometimes misreads streamed audio
    * (e.g. a 4:50 song shown as 9:39), so when the catalogue length disagrees clearly
@@ -215,6 +220,9 @@ class Player extends EventTarget {
       this._prepareNext();
     });
     a.addEventListener('ended', () => a === this.audio && this._onEnded());
+    for (const ev of ['loadstart', 'waiting', 'play', 'playing', 'canplay', 'pause', 'error', 'emptied']) {
+      a.addEventListener(ev, () => a === this.audio && this._emit('loading'));
+    }
     a.addEventListener('loadedmetadata', () => a === this.audio && this._emit('time'));
     a.addEventListener('timeupdate', () => a === this.audio && this._onTime());
     a.addEventListener('error', () => {

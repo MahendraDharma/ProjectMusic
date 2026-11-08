@@ -70,11 +70,25 @@ function isCurrent(track) {
   return !!(c && track && c.id === track.id);
 }
 
+/* Start looking up a song's audio the moment someone reaches for it (finger down or
+   mouse hovering), so it is ready by the time the tap/click lands. */
+function warm(track) {
+  if (server && track?.source === 'ytmusic') ytmusic.prepare(track);
+}
+function intent(track) {
+  let timer;
+  return {
+    onpointerdown: () => warm(track),
+    onmouseenter: () => { timer = setTimeout(() => warm(track), 250); },
+    onmouseleave: () => clearTimeout(timer),
+  };
+}
+
 function trackRow(track, list, index, { onPlay, onRemove, onMore, number } = {}) {
   const play = () => (onPlay ? onPlay(index) : player.playList(list, index));
   return h('div', { class: 'row' + (isCurrent(track) ? ' playing' : ''), dataset: { id: track.id } },
     number ? h('span', { class: 'row-num' }, index + 1) : null,
-    h('button', { class: 'row-main', onclick: play },
+    h('button', { class: 'row-main', onclick: play, ...intent(track) },
       artEl(track, 'row-art'),
       h('span', { class: 'row-text' },
         h('b', {}, track.title),
@@ -89,7 +103,7 @@ function trackList(tracks, opts) {
 }
 
 function trackCard(track, list, index) {
-  return h('button', { class: 'card', onclick: () => player.playList(list, index) },
+  return h('button', { class: 'card', onclick: () => player.playList(list, index), ...intent(track) },
     artEl(track, 'card-art', true),
     h('b', {}, track.title),
     h('small', {}, track.artist));
@@ -200,7 +214,7 @@ async function startRadio(track) {
 }
 
 function quickGrid(list) {
-  return h('div', { class: 'quick' }, list.map((tr, i) => h('button', { class: 'quick-item', onclick: () => player.playList(list, i) },
+  return h('div', { class: 'quick' }, list.map((tr, i) => h('button', { class: 'quick-item', onclick: () => player.playList(list, i), ...intent(tr) },
     artEl(tr, 'quick-art'), h('span', {}, tr.title))));
 }
 
@@ -336,7 +350,7 @@ const pages = {
             data.tracks.length ? trackList(data.tracks, { onPlay: (i) => { recentSearches.add(query); player.playList(data.tracks, i); } })
               : emptyState(t('noResults', { q: query }), t('tryArtist')),
           ].filter(Boolean));
-          if (data.tracks.length) saveTimer = setTimeout(() => recentSearches.add(query), 1500);
+          if (data.tracks.length) saveTimer = setTimeout(() => { recentSearches.add(query); data.tracks.slice(0, 2).forEach(warm); }, 1500);
         } else {
           const tracks = await audius.search(query, signal);
           results.replaceChildren(tracks.length ? trackList(tracks) : emptyState(t('noResults', { q: query }), t('tryArtist')));
@@ -1187,6 +1201,10 @@ function init() {
 
   player.addEventListener('state', () => { syncPlayer(); fillRadio(); });
   player.addEventListener('time', syncTime);
+  player.addEventListener('loading', () => {
+    const on = player.loading;
+    for (const b of [mini.play, bar.play, np.play]) b?.classList.toggle('loading', on);
+  });
   player.addEventListener('queue', () => {
     if (npMode === 'queue' && !np.root.hidden) renderQueue(np.queue);
     if (panelTab === 'queue') renderQueue(panel.body);

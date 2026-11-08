@@ -85,9 +85,13 @@ export function lyrics(track, signal) {
 export const streamUrl = (track) => `${base}api/stream?id=${encodeURIComponent(track.videoId)}`;
 export const downloadUrl = (track) => streamUrl(track) + '&download=1';
 /** Ask the server to look up a song's audio link ahead of time (fire and forget). */
+const prepared = new Map(); // videoId -> time asked, so each song is asked for once
 export function prepare(track) {
   if (!track || track.source !== 'ytmusic' || !track.videoId) return;
-  fetch(`${base}api/prepare?id=${encodeURIComponent(track.videoId)}`).catch(() => {});
+  const last = prepared.get(track.videoId);
+  if (last && Date.now() - last < 3 * 3600 * 1000) return; // audio links last ~6 h
+  prepared.set(track.videoId, Date.now());
+  fetch(`${base}api/prepare?id=${encodeURIComponent(track.videoId)}`).catch(() => prepared.delete(track.videoId));
 }
 // Artwork through the server, with CORS, so it can be drawn on a <canvas> (share cards, colours).
 export const imageUrl = (url) => (url ? `${base}api/image?url=${encodeURIComponent(url)}` : '');
