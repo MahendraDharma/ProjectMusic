@@ -3,7 +3,7 @@
 import { player } from './player.js';
 import { favs, history as recents, prefs, recentSearches, persistable, playlists } from './store.js';
 import { t, lang } from './i18n.js';
-import { h, icon, setIcon, logo, fmt, toast, openSheet, closeSheet, skeletonRows, skeletonCards } from './ui.js';
+import { h, icon, setIcon, logo, fmt, toast, openSheet, closeSheet, skeletonRows, skeletonCards, pixelCloud } from './ui.js';
 import * as audius from './sources/audius.js';
 import * as local from './sources/local.js';
 import * as ytmusic from './sources/ytmusic.js';
@@ -689,7 +689,7 @@ function buildMini() {
     art: h('img', { class: 'mini-art', alt: '' }),
     title: h('b', {}), artist: h('small', {}),
     like: h('button', { class: 'icon-btn', 'aria-label': t('addLiked'), onclick: () => player.current && toggleLike(player.current) }, icon('heart', 22)),
-    play: h('button', { class: 'icon-btn ink', 'aria-label': t('play'), onclick: () => player.toggle() }, icon('play', 24)),
+    play: h('button', { class: 'icon-btn ink', 'aria-label': t('play'), onclick: () => player.toggle() }, icon('play', 24), pixelCloud('play-cloud')),
     bar: h('i', { class: 'mini-progress' }),
   };
   $('mini').replaceChildren(
@@ -704,7 +704,7 @@ function buildBar() {
     title: h('b', {}), artist: h('small', {}),
     like: h('button', { class: 'icon-btn', 'aria-label': t('addLiked'), onclick: () => player.current && toggleLike(player.current) }, icon('heart', 20)),
     shuffle: h('button', { class: 'icon-btn', 'aria-label': t('shuffle'), onclick: () => player.toggleShuffle() }, icon('shuffle', 18)),
-    play: h('button', { class: 'play-sm', 'aria-label': t('play'), onclick: () => player.toggle() }, icon('play', 20)),
+    play: h('button', { class: 'play-sm', 'aria-label': t('play'), onclick: () => player.toggle() }, icon('play', 20), pixelCloud('play-cloud')),
     repeat: h('button', { class: 'icon-btn', 'aria-label': t('repeatOff'), onclick: () => cycleRepeat() }, icon('repeat', 18)),
     cur: h('span', { class: 'time' }, '0:00'), dur: h('span', { class: 'time' }, '0:00'),
     seek: h('input', { type: 'range', min: 0, max: 1000, value: 0, class: 'seek', 'aria-label': t('nowPlayingLabel') }),
@@ -760,7 +760,7 @@ function buildNowPlaying() {
     seek: h('input', { type: 'range', min: 0, max: 1000, value: 0, class: 'seek', 'aria-label': t('nowPlayingLabel') }),
     cur: h('span', {}, '0:00'), dur: h('span', {}, '0:00'),
     shuffle: h('button', { class: 'icon-btn', 'aria-label': t('shuffle'), onclick: () => player.toggleShuffle() }, icon('shuffle', 22)),
-    play: h('button', { class: 'play-lg', 'aria-label': t('play'), onclick: () => player.toggle() }, icon('play', 34)),
+    play: h('button', { class: 'play-lg', 'aria-label': t('play'), onclick: () => player.toggle() }, icon('play', 34), pixelCloud('play-cloud')),
     repeat: h('button', { class: 'icon-btn', 'aria-label': t('repeatOff'), onclick: () => cycleRepeat() }, icon('repeat', 22)),
     lyricsChip: h('button', { class: 'chip-soft', onclick: () => setNpMode(npMode === 'lyrics' ? 'art' : 'lyrics') }, icon('lyrics', 18), t('lyrics')),
     sleepChip: h('button', { class: 'chip-soft', onclick: () => cycleSleep() }, icon('moon', 18), h('span', {}, t('sleep'))),
@@ -776,7 +776,7 @@ function buildNowPlaying() {
       h('button', { class: 'icon-btn ink', 'aria-label': t('moreOptions'), onclick: () => player.current && songSheet(player.current) }, icon('more', 24))),
     h('div', { class: 'np-body' },
       h('div', { class: 'np-main' },
-        h('div', { class: 'np-stage' }, np.art),
+        h('div', { class: 'np-stage' }, np.art, h('div', { class: 'np-loading' }, pixelCloud())),
         h('div', { class: 'np-meta' }, h('div', { class: 'row-text' }, np.title, np.artist), np.like),
         np.seek, h('div', { class: 'np-times' }, np.cur, np.dur),
         h('div', { class: 'np-ctl' }, np.shuffle,
@@ -1063,6 +1063,7 @@ function syncPlayer() {
   const tr = player.current;
   document.body.classList.toggle('has-player', !!tr);
   if (!tr || !mini.art) return;
+  syncTime(); // show the song's length right away, before any audio arrives
   const small = art(tr) || 'icons/icon-192.png';
   const large = art(tr, true) || 'icons/icon-512.png';
   for (const el of [mini.art, bar.art]) if (el.getAttribute('src') !== small) el.src = small;
@@ -1221,6 +1222,7 @@ function init() {
   player.addEventListener('loading', () => {
     const on = player.loading;
     for (const b of [mini.play, bar.play, np.play]) b?.classList.toggle('loading', on);
+    document.body.classList.toggle('song-loading', on);
   });
   player.addEventListener('queue', () => {
     if (npMode === 'queue' && !np.root.hidden) renderQueue(np.queue);
@@ -1256,7 +1258,11 @@ function init() {
 
   render();
   syncPlayer();
-  connectServer().then(showIntro);
+  // Opening screen (pixel cloud over the blurred app) until the server check is done.
+  const boot = $('boot');
+  const hideBoot = () => { if (!boot || boot.classList.contains('done')) return; boot.classList.add('done'); setTimeout(() => boot.remove(), 400); };
+  setTimeout(hideBoot, 4000); // never keep people waiting long
+  connectServer().then(() => { hideBoot(); showIntro(); }, hideBoot);
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

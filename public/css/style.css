@@ -549,11 +549,34 @@ body.dragging .drop { display: grid; }
 }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 
-/* Play button while a song is being fetched: a thin spinning ring */
-.icon-btn.loading, .play-sm.loading, .play-lg.loading { position: relative; }
-.icon-btn.loading::after, .play-sm.loading::after, .play-lg.loading::after {
-  content: ""; position: absolute; inset: 1px; border-radius: 50%; pointer-events: none;
-  border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent);
-  animation: spin .9s linear infinite;
+/* ---------- Pixel cloud loading ---------- */
+.pcloud-wrap { display: inline-grid; place-items: center; pointer-events: none; }
+.pcloud { width: 100%; height: auto; overflow: visible; }
+.pcloud .pc-body { animation: pc-bob 2.4s ease-in-out infinite; }
+.pcloud .pc-body rect { fill: #fff; animation: pc-shimmer 1.4s ease-in-out infinite; animation-delay: calc(var(--i) * 70ms); }
+.pcloud .drop { fill: var(--accent); opacity: 0; animation: pc-drop 1.2s steps(4) infinite; animation-delay: calc(var(--i) * 400ms); }
+@keyframes pc-shimmer { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes pc-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.35px); } }
+@keyframes pc-drop { 0% { opacity: 0; transform: translateY(-1px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(3px); } }
+
+/* opening screen: cloud over the blurred app */
+.boot { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(13, 14, 16, .55); -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2); transition: opacity .35s ease; }
+.boot.done { opacity: 0; pointer-events: none; }
+.boot-cloud { width: 96px; }
+
+/* song loading: artwork blurred with the cloud on top; the cloud replaces the play icon */
+.np-stage { position: relative; }
+.np-loading, .art-loading { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transition: opacity .25s; pointer-events: none; }
+.np-loading .pcloud-wrap { width: 30%; max-width: 120px; }
+.np-art, .mini-art, .bar-art, .panel-art { transition: filter .3s ease; }
+body.song-loading .np-art, body.song-loading .mini-art, body.song-loading .bar-art, body.song-loading .panel-art { filter: blur(10px) brightness(.65); }
+body.song-loading .np-loading { opacity: 1; }
+.play-cloud { display: none; width: 58%; }
+.loading .play-cloud { display: inline-grid; }
+.loading > svg.ic { display: none; }
+.play-sm.loading .pcloud .pc-body rect, .play-lg.loading .pcloud .pc-body rect { fill: var(--bg); }
+@media (prefers-reduced-motion: reduce) {
+  .pcloud .pc-body { animation: none; }
+  .pcloud .pc-body rect { animation-duration: 2.8s; }
+  .pcloud .drop { animation-duration: 2.4s; }
 }
-@media (prefers-reduced-motion: reduce) { .loading::after { animation-duration: 2.4s; } }
