@@ -31,10 +31,40 @@ charts, search, artist pages, autoplay radio, synced lyrics and downloads.
    Or double-click `server/start.command` (if macOS refuses: right-click → **Open** → **Open**).
 4. Open <http://localhost:8080>.
 
-### Linux
-```bash
-sh server/start.sh
-```
+### Linux (Ubuntu, Debian, Fedora, Arch, Mint, …)
+1. Make sure Python 3.10+ is installed. If the installer says something is missing, it prints the exact
+   command for your distribution, for example on Ubuntu/Debian:
+   ```bash
+   sudo apt install python3 python3-venv python3-pip
+   ```
+2. Download ProjectMusic (green **Code → Download ZIP**, then extract), or clone it:
+   ```bash
+   git clone https://github.com/MahendraDharma/ProjectMusic
+   ```
+3. Install it for your user (no sudo needed). It adds **ProjectMusic** to your app menu with its icon:
+   ```bash
+   sh ProjectMusic/server/install-linux.sh
+   ```
+   Want the server to start automatically every time you log in? Use this instead:
+   ```bash
+   sh ProjectMusic/server/install-linux.sh --autostart
+   ```
+4. Open **ProjectMusic** from your app menu (GNOME, KDE, Xfce, Cinnamon…). The server starts in the background
+   and your browser opens <http://localhost:8080>. In Chrome or Edge you can also press **Install** in the
+   address bar to get its own window.
+
+Useful commands:
+
+| What | Command |
+|---|---|
+| Start without the menu | `sh ProjectMusic/server/linux-launch.sh` |
+| Run in the terminal (see logs) | `sh ProjectMusic/server/start.sh` |
+| Stop the autostart service | `systemctl --user stop projectmusic` |
+| Remove menu entry and autostart | `sh ProjectMusic/server/install-linux.sh --uninstall` |
+
+With `--autostart` the server runs as a systemd user service when available (logs:
+`journalctl --user -u projectmusic`), otherwise through your desktop's autostart. The launcher's log is
+in `server/server.log`.
 
 ## 2. Android phone (Termux)
 

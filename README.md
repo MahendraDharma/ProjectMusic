@@ -49,9 +49,11 @@ python3 -m http.server 8080 -d public
 With the personal server (YouTube Music, lyrics, share cards) — see the
 [server guide](docs/SERVER-GUIDE.md):
 
-```bash
-sh server/start.sh
-```
+- **Windows:** double-click `server/start.bat`
+- **Mac:** `sh server/start.sh` (or double-click `server/start.command`)
+- **Linux:** `sh server/install-linux.sh` adds ProjectMusic to your app menu
+  (`--autostart` starts it at every login, `--uninstall` removes it)
+- **Android:** run `server/start.sh` in Termux
 
 Then open <http://localhost:8080>.
 
@@ -81,7 +83,8 @@ public/
 └── manifest.webmanifest
 server/
 ├── projectmusic_server.py  # personal server: catalogue (ytmusicapi) + audio (yt-dlp)
-└── start.sh / start.bat / start.command
+├── start.sh / start.bat / start.command
+└── install-linux.sh / linux-launch.sh   # Linux app-menu entry + optional autostart
 docs/
 ├── SERVER-GUIDE.md · PANDUAN-SERVER.md
 ├── desain/                 # design mockups
