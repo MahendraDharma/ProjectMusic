@@ -75,6 +75,11 @@ function isCurrent(track) {
 function warm(track) {
   if (server && track?.source === 'ytmusic') ytmusic.prepare(track);
 }
+/** Prepare the first songs of a page a moment after it opens (if the person stays). */
+function warmFirst(list, n = 2) {
+  const route = location.hash;
+  setTimeout(() => { if (location.hash === route) list.slice(0, n).forEach(warm); }, 1200);
+}
 function intent(track) {
   let timer;
   return {
@@ -238,6 +243,7 @@ const pages = {
     const radioBox = h('div', {});
 
     show(homeHead(greeting(), true), recent.length ? quickGrid(recent.slice(0, 6)) : null, madeBox, chartBox, radioBox);
+    warmFirst(recent, 2); // the songs played last are the likeliest to be played again
 
     // Made for you + your top artists, from the on-device taste model
     const tops = taste.topArtists(6);
@@ -469,6 +475,7 @@ const pages = {
     show(skeletonRows(8));
     try {
       const a = await ytmusic.artist(id, abortable());
+      warmFirst(a.tracks);
       show(
         h('div', { class: 'hero' }, a.artwork ? h('img', { class: 'hero-art', src: a.artwork, alt: '' }) : null,
           h('div', {}, h('h1', {}, a.name), h('p', { class: 'hint' }, t('songs', { n: a.tracks.length })))),
@@ -487,6 +494,7 @@ const pages = {
     show(skeletonRows(8));
     try {
       const pl = await ytmusic.playlist(id, abortable());
+      warmFirst(pl.tracks);
       show(h('header', { class: 'page-head' }, h('h1', {}, pl.title || '')),
         h('div', { class: 'row-actions' }, h('button', { class: 'btn primary', onclick: () => player.playList(pl.tracks, 0) }, icon('play', 18), t('playAll'))),
         trackList(pl.tracks, { number: true }));
@@ -512,6 +520,7 @@ const pages = {
     const pl = playlists.get(params.get('id') || '');
     if (!pl) return show(emptyState(t('loadFailed'), null, h('a', { class: 'btn', href: '#/library' }, t('library'))));
     const list = pl.tracks;
+    warmFirst(list);
     const menu = () => openSheet([
       h('h2', { class: 'sheet-title' }, pl.name),
       h('button', { class: 'sheet-act', onclick: () => nameSheet(t('rename'), pl.name, (name) => { playlists.rename(pl.id, name); render(); }) }, icon('edit'), h('span', {}, t('rename'))),

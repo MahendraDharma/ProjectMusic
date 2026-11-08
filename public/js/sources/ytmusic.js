@@ -91,7 +91,10 @@ export function prepare(track) {
   const last = prepared.get(track.videoId);
   if (last && Date.now() - last < 3 * 3600 * 1000) return; // audio links last ~6 h
   prepared.set(track.videoId, Date.now());
-  fetch(`${base}api/prepare?id=${encodeURIComponent(track.videoId)}`).catch(() => prepared.delete(track.videoId));
+  fetch(`${base}api/prepare?id=${encodeURIComponent(track.videoId)}`)
+    .then((r) => r.json())
+    .then((d) => { if (d && d.queued === false) prepared.delete(track.videoId); }) // server busy: ask again later
+    .catch(() => prepared.delete(track.videoId));
 }
 // Artwork through the server, with CORS, so it can be drawn on a <canvas> (share cards, colours).
 export const imageUrl = (url) => (url ? `${base}api/image?url=${encodeURIComponent(url)}` : '');
