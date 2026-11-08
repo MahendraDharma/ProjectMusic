@@ -59,7 +59,8 @@ class Player extends EventTarget {
     const d = this.audio.duration;
     const known = this.current?.duration || 0;
     const ok = Number.isFinite(d) && d > 0;
-    if (known > 0 && (!ok || Math.abs(d - known) > Math.max(8, known * 0.15))) return known;
+    // Only when the browser says *longer*: a shorter file still ends on its own.
+    if (known > 0 && (!ok || d - known > Math.max(8, known * 0.15))) return known;
     return ok ? d : 0;
   }
   get volume() {
