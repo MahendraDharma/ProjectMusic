@@ -81,7 +81,7 @@ Then open <http://localhost:8080>.
 public/
 ├── index.html              # app shell
 ├── css/style.css           # design tokens + phone & desktop layouts
-├── fonts/                  # DM Sans (SIL Open Font License)
+├── fonts/                  # DM Sans + Plus Jakarta Sans (SIL Open Font License)
 ├── js/
 │   ├── app.js              # routing, pages, Now Playing, lyrics, share flow, settings
 │   ├── player.js           # playback engine: queue, shuffle, repeat, crossfade, Media Session
@@ -108,7 +108,7 @@ docs/
 
 Inspired by [BitChord](https://github.com/kushagrasinghx/BitChord) and [ytify](https://github.com/n-ce/ytify).
 Uses [ytmusicapi](https://github.com/sigma67/ytmusicapi), [yt-dlp](https://github.com/yt-dlp/yt-dlp),
-[LRCLIB](https://lrclib.net), [Audius](https://audius.org) and the [DM Sans](https://fonts.google.com/specimen/DM+Sans) typeface.
+[LRCLIB](https://lrclib.net), [Audius](https://audius.org) and the [DM Sans](https://fonts.google.com/specimen/DM+Sans) and [Plus Jakarta Sans](https://fonts.google.com/specimen/Plus+Jakarta+Sans) typefaces.
 
 ProjectMusic is not affiliated with YouTube, Google, Instagram or Audius. Personal server mode
 accesses YouTube unofficially; using it is subject to YouTube's Terms of Service and is each
