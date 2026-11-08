@@ -173,9 +173,18 @@ details p { margin: 0; padding: 0 16px 16px; color: var(--ink2); font-size: 15px
 .d-taste span:nth-child(5) { animation-delay: -1.9s; }
 @keyframes grow { 0%, 100% { height: 20%; } 50% { height: 100%; } }
 
+/* "Reduce motion" (Android: Remove animations / battery saver, iPhone: Reduce Motion):
+   keep calm effects — the logo still draws itself, sections fade in, lyric lines light up —
+   but stop anything that slides, spins, bounces or zooms. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .la-stem, .la-bowl, .la-note, .la-flag { stroke-dashoffset: 0; }
-  .la-dot { transform: none; }
-  .eq, .reveal { opacity: 1; transform: none; }
+  .hero h1, .hero .lead, .hero .status, .hero .cta, .hero .meta { animation-name: fade-in-soft; }
+  .la-bg { animation-name: fade-in-soft; }
+  .la-dot { animation: dot-in .5s 1.5s ease-out forwards; }
+  .reveal { transform: none; transition: opacity .8s ease var(--d, 0ms); }
+  .eq span, .d-taste span, .d-fade span { animation-duration: 3s; }
+  .d-cards, .d-mix .deck, .d-mix .rail i, .d-share .story { animation: none; }
+  .d-share .story { transform: rotate(-4deg); }
+  .d-mix .rail i { left: 50%; }
 }
+@keyframes fade-in-soft { from { opacity: 0; } }
+@keyframes dot-in { from { opacity: 0; transform: scale(1); } to { opacity: 1; transform: scale(1); } }
