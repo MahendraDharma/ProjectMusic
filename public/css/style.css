@@ -470,7 +470,14 @@ body.dragging .drop { display: grid; }
 @keyframes intro-pop { to { transform: scale(1); } }
 @keyframes intro-rise { from { opacity: 0; transform: translateY(14px); } }
 
+/* "Reduce motion": no sliding, zooming or shimmer, but the welcome logo still draws
+   itself and things fade in, so the app doesn't feel broken. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .intro-logo path, .intro-logo circle { stroke-dashoffset: 0 !important; transform: none !important; }
+  .np, .intro, .intro h1, .intro .hint, .intro li, .intro-actions, .intro-logo rect { animation-name: intro-in !important; }
+  .intro-logo circle:not([fill="none"]) { transform: none; animation: intro-in .5s 1.55s both !important; }
+  .skel { animation: none; }
+  .sheet { transition: opacity .2s; transform: none; }
+  .sheet-root.open .sheet { transform: none; }
+  @media (min-width: 1024px) { .sheet, .sheet-root.open .sheet { transform: translate(-50%, -50%); } }
+  .switch span { transition: none; }
 }
