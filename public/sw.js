@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi (HTML/CSS/JS) agar terbuka cepat & bisa
 // di-install. Request ke API/audio (domain lain) tidak disentuh — selalu langsung ke jaringan.
-const VERSION = 'pm-v10';
+const VERSION = 'pm-v11';
 const SHELL = [
   './',
   'index.html',
@@ -22,7 +22,10 @@ const SHELL = [
   'js/sources/ytmusic.js',
   'icons/icon.svg',
   'icons/icon-192.png',
-  'icons/apple-touch-icon.png',
+  'icons/favicon.svg',
+  'icons/favicon-32.png',
+  'icons/touch-icon.png',
+  'favicon.ico',
   'manifest.webmanifest',
 ];
 
