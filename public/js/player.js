@@ -32,6 +32,13 @@ class Player extends EventTarget {
     this._lastTime = 0;
     this.canFade = volumeWorks();
     this.resolve = (t) => t.streamUrl; // set by app.js (e.g. personal server address)
+    this.prepare = () => {}; // set by app.js: let the server look up an upcoming song early
+    this._preloaded = null; // id of the song already loading in `standby`
+    this._endedFor = null; // id of the song whose end was already handled
+    this._stuck = { t: -1, since: 0 };
+    // End-of-song watchdog: if the music stops moving in the last seconds (a stalled
+    // stream) or the browser never fires "ended", move on anyway.
+    setInterval(() => this._watchdog(), 1000);
     this._bindMediaSession();
     this._restore();
   }
@@ -192,6 +199,7 @@ class Player extends EventTarget {
       if (a !== this.audio) return;
       this._errors = 0;
       history.push(this.current);
+      this._prepareNext();
     });
     a.addEventListener('ended', () => a === this.audio && this._onEnded());
     a.addEventListener('loadedmetadata', () => a === this.audio && this._emit('time'));
@@ -214,6 +222,18 @@ class Player extends EventTarget {
     // Start the crossfade a few seconds before the end.
     const d = a.duration;
     const fade = this.fadeSeconds;
+    // Start buffering the next song ~8 s before the fade, so it comes in without a gap.
+    if (!this._fade && this.canFade && fade > 0 && Number.isFinite(d) && d - t <= fade + 8 && !a.paused
+        && this.repeat !== 'one' && !this.stopAfterCurrent) {
+      const p = this._nextPos(true);
+      const nt = p >= 0 ? this.queue[this.order[p]] : null;
+      if (nt && this._preloaded !== nt.id) {
+        this._preloaded = nt.id;
+        this.standby.preload = 'auto';
+        this.standby.src = this.resolve(nt);
+        this.standby.load();
+      }
+    }
     if (!this._fade && this.canFade && fade > 0 && Number.isFinite(d) && d > fade * 3
         && d - t <= fade && !a.paused && this.repeat !== 'one' && !this.stopAfterCurrent) {
       const p = this._nextPos(true);
@@ -222,6 +242,9 @@ class Player extends EventTarget {
   }
 
   _onEnded() {
+    const id = this.current?.id;
+    if (id && this._endedFor === id) return; // already handled (event + watchdog)
+    this._endedFor = id;
     if (this.stopAfterCurrent) {
       this.stopAfterCurrent = false;
       this._emit('sleep');
@@ -243,7 +266,9 @@ class Player extends EventTarget {
     const from = this.audio;
     const to = this.standby;
     const nextTrack = this.queue[this.order[nextPos]];
-    to.src = this.resolve(nextTrack);
+    if (this._preloaded !== nextTrack.id || !to.getAttribute('src')) to.src = this.resolve(nextTrack);
+    this._preloaded = null;
+    this._endedFor = null;
     to.volume = 0;
     const startVol = this._volume;
     const steps = Math.max(1, Math.round((seconds * 1000) / TICK));
@@ -301,10 +326,27 @@ class Player extends EventTarget {
     this.order = this.queue.length ? [firstIndex, ...rest] : [];
   }
 
+  _watchdog() {
+    const a = this.audio;
+    if (this._fade || a.paused || !Number.isFinite(a.duration) || a.duration <= 0) return;
+    // Only near the end: a stall in the middle is just slow network and should keep waiting.
+    if (a.currentTime < a.duration - 5) { this._stuck = { t: -1, since: 0 }; return; }
+    if (a.currentTime !== this._stuck.t) { this._stuck = { t: a.currentTime, since: Date.now() }; return; }
+    if (Date.now() - this._stuck.since > 3000) this._onEnded();
+  }
+
+  _prepareNext() {
+    const p = this._nextPos(true);
+    if (p >= 0) this.prepare(this.queue[this.order[p]]);
+  }
+
   _load(autoplay) {
     const t = this.current;
     if (!t) return;
     this._finishListen();
+    this._endedFor = null;
+    this._stuck = { t: -1, since: 0 };
+    if (this._preloaded && this._preloaded !== t.id) this._preloaded = null;
     this.audio.src = this.resolve(t);
     this.audio.volume = this._volume;
     this._updateMediaSession();

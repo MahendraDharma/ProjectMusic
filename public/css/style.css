@@ -2,6 +2,9 @@
    Mobile first; desktop layout from 1024px. Glass only on floating layers. */
 @font-face { font-family: "DM Sans"; src: url(../fonts/DMSans-400.ttf) format("truetype"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "DM Sans"; src: url(../fonts/DMSans-500.ttf) format("truetype"); font-weight: 500 700; font-display: swap; }
+/* Lyrics font: Plus Jakarta Sans (SIL OFL), loaded only when lyrics are shown. */
+@font-face { font-family: "Plus Jakarta Sans"; src: url(../fonts/PlusJakartaSans-500.woff2) format("woff2"); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url(../fonts/PlusJakartaSans-700.woff2) format("woff2"); font-weight: 600 800; font-display: swap; }
 
 :root {
   --deep: #0A0B0C;
@@ -269,12 +272,13 @@ body.np-open { overflow: hidden; }
 .np-queue { max-height: 46vh; overflow-y: auto; margin: 4px 0 18px; }
 
 /* lyrics lines */
+.lyrics-box, .lyrics-plain { font-family: "Plus Jakarta Sans", "DM Sans", system-ui, sans-serif; }
 .lyrics-box { display: flex; flex-direction: column; gap: 6px; padding: 28px 0 40vh; }
-.lyric { text-align: left; padding: 6px 0; font-weight: 700; font-size: 26px; line-height: 1.22; letter-spacing: -0.015em; color: rgba(255, 255, 255, .5); transition: color .3s, opacity .3s; }
+.lyric { text-align: left; padding: 6px 0; font-weight: 700; font-size: 26px; line-height: 1.22; letter-spacing: -0.005em; word-spacing: 0.04em; color: rgba(255, 255, 255, .5); transition: color .3s, opacity .3s; }
 .lyric.past { color: rgba(255, 255, 255, .32); }
 .lyric.now { color: #fff; }
 .lyric:hover { color: rgba(255, 255, 255, .8); }
-.lyrics-plain { white-space: pre-line; font-size: 17px; line-height: 1.6; }
+.lyrics-plain { white-space: pre-line; font-weight: 500; font-size: 17px; line-height: 1.6; }
 .lyrics-msg { color: rgba(237, 238, 240, .72); padding: 24px 0; }
 .lyrics-credit { margin-top: 18px; font-size: 12px; color: rgba(237, 238, 240, .6); }
 

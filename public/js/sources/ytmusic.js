@@ -75,5 +75,10 @@ export function lyrics(track, signal) {
 
 export const streamUrl = (track) => `${base}api/stream?id=${encodeURIComponent(track.videoId)}`;
 export const downloadUrl = (track) => streamUrl(track) + '&download=1';
+/** Ask the server to look up a song's audio link ahead of time (fire and forget). */
+export function prepare(track) {
+  if (!track || track.source !== 'ytmusic' || !track.videoId) return;
+  fetch(`${base}api/prepare?id=${encodeURIComponent(track.videoId)}`).catch(() => {});
+}
 // Artwork through the server, with CORS, so it can be drawn on a <canvas> (share cards, colours).
 export const imageUrl = (url) => (url ? `${base}api/image?url=${encodeURIComponent(url)}` : '');

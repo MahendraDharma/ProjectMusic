@@ -17,6 +17,7 @@ Pemakaian:  python projectmusic_server.py [--host 0.0.0.0] [--port 8080]
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import mimetypes
 import os
@@ -43,7 +44,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -161,11 +162,18 @@ _NOISE = re.compile(
 )
 
 
+_CHANNEL_SUFFIX = re.compile(
+    r"(\s*[-\u2013]?\s*\b(official|music|tv|channel|vevo|topic|records|band)\b)+\s*$", re.I
+)
+
+
 def clean_title(title: str, artist: str) -> str:
     """Rapikan judul gaya YouTube: buang "(Official Video)", nama artis di depan/belakang,
     dan ubah judul HURUF BESAR SEMUA menjadi Title Case."""
     t = _NOISE.sub("", title or "").strip()
     first = (artist or "").split(",")[0].strip().lower()
+    # Nama kanal sering diberi akhiran: "Jeyma Monica Official", "NOAH Music", "XYZ - Topic".
+    first = _CHANNEL_SUFFIX.sub("", first).strip() or first
     m = re.match(r"^(.+?)\s+[-\u2013\u2014|]\s+(.+)$", t)
     if m and first:
         left, right = m.group(1).strip(), m.group(2).strip()
@@ -389,6 +397,22 @@ def api_lyrics(q):
     return cached(f"lyrics:{vid}:{title}:{artist}", 6 * 3600, load)
 
 
+def api_prepare(q):
+    """Look up the audio link of an upcoming song in the background, so it starts
+    instantly when its turn comes (yt-dlp needs a few seconds per song)."""
+    vid = (q.get("id") or [""])[0]
+    if VIDEO_ID.match(vid) and cache.get("audio:" + vid) is None:
+        threading.Thread(target=lambda: _quiet(resolve_audio, vid), daemon=True).start()
+    return {"ok": True}
+
+
+def _quiet(fn, *args):
+    try:
+        fn(*args)
+    except Exception:
+        pass
+
+
 def api_health(_q):
     return {
         "ok": True,
@@ -408,6 +432,7 @@ API = {
     "/api/artist": api_artist,
     "/api/next": api_next,
     "/api/lyrics": api_lyrics,
+    "/api/prepare": api_prepare,
 }
 
 
@@ -436,6 +461,7 @@ def resolve_audio(vid: str, fresh: bool = False) -> dict:
         "headers": fmt.get("http_headers") or info.get("http_headers") or {},
         "ext": fmt.get("ext") or "m4a",
         "title": info.get("title") or vid,
+        "size": int(fmt.get("filesize") or 0),  # total bytes; looked up on first request if missing
     }
     # URL audio YouTube berlaku ±6 jam; simpan sedikit lebih singkat.
     cache.set(key, data, 4 * 3600)
@@ -555,58 +581,165 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- audio ----------------------------------------------------------- #
     def _stream(self, query):
+        """Send the audio to the browser.
+
+        YouTube throttles big open-ended downloads, which made playback stutter and
+        seeking slow. So the requested range is fetched from YouTube in small pieces
+        (512 KB first for a fast start/seek, then 4 MB) over ONE reused connection,
+        and passed on as a single, exact HTTP response."""
         vid = (query.get("id") or [""])[0]
         if not VIDEO_ID.match(vid):
             raise ValueError("id lagu tidak valid")
         download = (query.get("download") or ["0"])[0] == "1"
 
-        upstream = None
-        for attempt in range(2):
-            info = resolve_audio(vid, fresh=attempt > 0)
-            headers = dict(info["headers"])
-            if self.headers.get("Range"):
-                headers["Range"] = self.headers["Range"]
-            req = urllib.request.Request(info["url"], headers=headers, method=self.command)
-            try:
-                upstream = urlopen(req, timeout=20)
-                break
-            except urllib.error.HTTPError as e:
-                if e.code == 416:  # range di luar batas
-                    self.send_response(416)
-                    self.send_header("Content-Length", "0")
-                    self.end_headers()
-                    return
-                if e.code in (403, 410) and attempt == 0:
-                    cache.drop("audio:" + vid)  # URL kedaluwarsa → ambil ulang
-                    continue
-                raise
+        info = resolve_audio(vid)
+        up = Upstream(info)
+        try:
+            total = up.total_size()
+        except UpstreamExpired:
+            cache.drop("audio:" + vid)
+            info = resolve_audio(vid, fresh=True)
+            up = Upstream(info)
+            total = up.total_size()
 
-        with upstream:
-            self.send_response(upstream.status)
-            ctype = upstream.headers.get("Content-Type") or ("audio/mp4" if info["ext"] == "m4a" else "audio/webm")
-            if ctype.startswith("video/"):
-                ctype = "audio/" + ctype.split("/", 1)[1]
-            self.send_header("Content-Type", ctype)
-            for h in ("Content-Length", "Content-Range"):
-                if upstream.headers.get(h):
-                    self.send_header(h, upstream.headers[h])
-            self.send_header("Accept-Ranges", "bytes")
-            self.send_header("Cache-Control", "no-store")
-            if download:
-                safe = re.sub(r'[\\/:*?"<>|]+', " ", info["title"]).strip()[:120] or vid
-                fname = f"{safe}.{info['ext']}"
-                self.send_header(
-                    "Content-Disposition",
-                    "attachment; filename*=UTF-8''" + urllib.parse.quote(fname),
-                )
+        start, end, partial = 0, total - 1, False
+        rng = self.headers.get("Range", "")
+        m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
+        if m and (m.group(1) or m.group(2)):
+            partial = True
+            if m.group(1):
+                start = int(m.group(1))
+                end = min(int(m.group(2)), total - 1) if m.group(2) else total - 1
+            else:  # suffix range: last N bytes
+                start = max(0, total - int(m.group(2)))
+        if start >= total or start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{total}")
+            self.send_header("Content-Length", "0")
             self.end_headers()
-            if self.command == "HEAD":
-                return
-            while True:
-                chunk = upstream.read(64 * 1024)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
+            return
+
+        self.send_response(206 if partial else 200)
+        self.send_header("Content-Type", up.content_type)
+        self.send_header("Content-Length", str(end - start + 1))
+        if partial:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{total}")
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Cache-Control", "no-store")
+        if download:
+            safe = re.sub(r'[\\/:*?"<>|]+', " ", info["title"]).strip()[:120] or vid
+            fname = f"{safe}.{info['ext']}"
+            self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(fname))
+        self.end_headers()
+        if self.command == "HEAD":
+            up.close()
+            return
+        try:
+            pos = start
+            chunk = FIRST_CHUNK
+            renewed = False
+            while pos <= end:
+                stop = min(pos + chunk - 1, end)
+                try:
+                    for data in up.read_range(pos, stop):
+                        self.wfile.write(data)
+                        pos += len(data)
+                except UpstreamExpired:
+                    if renewed:
+                        raise
+                    # The link expired mid-song: get a fresh one and carry on from `pos`.
+                    renewed = True
+                    up.close()
+                    cache.drop("audio:" + vid)
+                    up = Upstream(resolve_audio(vid, fresh=True))
+                    continue
+                chunk = CHUNK
+        finally:
+            up.close()
+
+
+FIRST_CHUNK = 512 * 1024
+CHUNK = 4 * 1024 * 1024
+
+
+class UpstreamExpired(Exception):
+    """The YouTube audio URL is no longer valid (403/410)."""
+
+
+class Upstream:
+    """One reusable connection to the audio host, fetching byte ranges."""
+
+    def __init__(self, info: dict):
+        self.info = info
+        u = urllib.parse.urlsplit(info["url"])
+        self.https = u.scheme == "https"
+        self.host = u.netloc
+        self.path = u.path + ("?" + u.query if u.query else "")
+        self.conn = None
+        self.content_type = "audio/mp4" if info["ext"] == "m4a" else "audio/webm"
+
+    def _connect(self):
+        if self.conn is None:
+            if self.https:
+                self.conn = http.client.HTTPSConnection(self.host, timeout=20, context=SSL_CONTEXT)
+            else:
+                self.conn = http.client.HTTPConnection(self.host, timeout=20)
+        return self.conn
+
+    def _request(self, first: int, last: int):
+        headers = dict(self.info["headers"])
+        headers["Range"] = f"bytes={first}-{last}"
+        for attempt in range(3):
+            try:
+                conn = self._connect()
+                conn.request("GET", self.path, headers=headers)
+                resp = conn.getresponse()
+            except (http.client.HTTPException, OSError):
+                self.close()  # stale keep-alive connection: reconnect
+                if attempt == 2:
+                    raise
+                continue
+            if resp.status in (403, 410):
+                resp.read()
+                raise UpstreamExpired()
+            if resp.status not in (200, 206):
+                resp.read()
+                raise RuntimeError(f"audio host answered {resp.status}")
+            ctype = resp.getheader("Content-Type") or ""
+            if ctype:
+                self.content_type = ("audio/" + ctype.split("/", 1)[1]) if ctype.startswith("video/") else ctype
+            return resp
+        raise RuntimeError("audio host unreachable")
+
+    def total_size(self) -> int:
+        if self.info.get("size"):
+            return self.info["size"]
+        resp = self._request(0, 0)
+        resp.read()
+        cr = resp.getheader("Content-Range") or ""
+        m = re.search(r"/(\d+)$", cr)
+        size = int(m.group(1)) if m else int(resp.getheader("Content-Length") or 0)
+        if not size:
+            raise RuntimeError("unknown audio size")
+        self.info["size"] = size
+        return size
+
+    def read_range(self, first: int, last: int):
+        resp = self._request(first, last)
+        while True:
+            # read1: pass on whatever has arrived instead of waiting for a full block
+            data = resp.read1(64 * 1024)
+            if not data:
+                break
+            yield data
+
+    def close(self):
+        if self.conn is not None:
+            try:
+                self.conn.close()
+            except Exception:
+                pass
+            self.conn = None
 
 
 # --------------------------------------------------------------------------- #

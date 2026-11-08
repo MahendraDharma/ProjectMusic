@@ -1,12 +1,14 @@
 // Service worker: menyimpan "cangkang" aplikasi (HTML/CSS/JS) agar terbuka cepat & bisa
 // di-install. Request ke API/audio (domain lain) tidak disentuh — selalu langsung ke jaringan.
-const VERSION = 'pm-v8';
+const VERSION = 'pm-v10';
 const SHELL = [
   './',
   'index.html',
   'css/style.css',
   'fonts/DMSans-400.ttf',
   'fonts/DMSans-500.ttf',
+  'fonts/PlusJakartaSans-500.woff2',
+  'fonts/PlusJakartaSans-700.woff2',
   'js/app.js',
   'js/player.js',
   'js/store.js',

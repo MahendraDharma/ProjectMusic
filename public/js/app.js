@@ -1069,6 +1069,7 @@ function init() {
   player.fadeSeconds = prefs.get('fade');
   player.volume = prefs.get('volume') ?? 1;
   player.resolve = (tr) => (tr.source === 'ytmusic' ? ytmusic.streamUrl(tr) : tr.streamUrl);
+  player.prepare = (tr) => { if (server) ytmusic.prepare(tr); };
 
   // Remember where the music started ("Playing from …") and stop the mixer.
   const origPlayList = player.playList.bind(player);

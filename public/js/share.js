@@ -121,10 +121,15 @@ function ellipsize(ctx, text, maxWidth) {
 
 async function fonts() {
   try {
-    await Promise.all([document.fonts.load('500 64px "DM Sans"'), document.fonts.load('400 40px "DM Sans"')]);
+    await Promise.all([
+      document.fonts.load('500 64px "DM Sans"'),
+      document.fonts.load('400 40px "DM Sans"'),
+      document.fonts.load('700 64px "Plus Jakarta Sans"'),
+    ]);
   } catch { /* system font fallback */ }
 }
 const FONT = '"DM Sans", system-ui, sans-serif';
+const LYRIC_FONT = '"Plus Jakarta Sans", "DM Sans", system-ui, sans-serif';
 
 /* ---------- Design A: lyrics card ---------- */
 export async function lyricsCard({ track, lines, img, palette, accent = '#FF375F' }) {
@@ -148,14 +153,14 @@ export async function lyricsCard({ track, lines, img, palette, accent = '#FF375F
   let size = 96;
   let wrapped;
   for (; size >= 52; size -= 4) {
-    ctx.font = `500 ${size}px ${FONT}`;
+    ctx.font = `700 ${size}px ${LYRIC_FONT}`;
     wrapped = lines.flatMap((l) => wrap(ctx, l, W - 184));
-    if (wrapped.length * size * 1.16 <= 900) break;
+    if (wrapped.length * size * 1.2 <= 900) break;
   }
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'top';
   let y = 560;
-  for (const l of wrapped) { ctx.fillText(l, 92, y); y += size * 1.16; }
+  for (const l of wrapped) { ctx.fillText(l, 92, y); y += size * 1.2; }
   if (!text) wrapped = [];
 
   // song chip
