@@ -83,6 +83,7 @@ const defaults = {
   autoRadio: true,
   serverUrl: '',
   volume: 1,
+  introSeen: false,
 };
 let settings = { ...defaults, ...load('settings', {}) };
 export const prefs = {

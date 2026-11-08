@@ -1,4 +1,16 @@
-# ProjectMusic
+<p align="center">
+  <img src="docs/brand/banner.png" alt="ProjectMusic — a free, lightweight, open-source music player for the web" width="100%">
+</p>
+
+<h1 align="center">
+  <img src="docs/brand/logo.svg" alt="" width="40" align="center"> ProjectMusic
+</h1>
+
+<p align="center">
+  <a href="https://mahendradharma.github.io/ProjectMusic/"><b>Open the app</b></a> ·
+  <a href="https://mahendradharma.github.io/ProjectMusic/get/"><b>Download & setup</b></a> ·
+  <a href="docs/PANDUAN-SERVER.md">Panduan (Bahasa Indonesia)</a>
+</p>
 
 A **free**, **lightweight**, **open-source** music player for the web — part of the
 "Project" family of apps (alongside [Project-Fit](https://github.com/MahendraDharma/project-fit)).
