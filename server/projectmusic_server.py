@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -397,18 +397,37 @@ def api_lyrics(q):
     return cached(f"lyrics:{vid}:{title}:{artist}", 6 * 3600, load)
 
 
+def _fast_refused():
+    """A fast-path link was refused by the audio host: count it like a failed lookup."""
+    _fast["misses"] += 1
+    if _fast["misses"] >= 3:
+        _fast.update(misses=0, off_until=time.time() + 1800)
+        _log("audio: fast lookup links are refused right now, using the full one for 30 min")
+
+
+def open_audio(vid: str):
+    """(info, upstream, total size) for a song, renewing an expired or refused link once."""
+    info = resolve_audio(vid)
+    up = Upstream(info)
+    try:
+        return info, up, up.total_size()
+    except UpstreamExpired:
+        up.close()
+        cache.drop("audio:" + vid)
+        if info.get("path") == "fast":
+            _fast_refused()
+        info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
+        up = Upstream(info)
+        return info, up, up.total_size()
+
+
 _prepare_slots = threading.BoundedSemaphore(3)
 
 
 def _prepare(vid: str):
     try:
-        info = resolve_audio(vid)
-        if not info.get("size"):  # learn the file size now, saving a round trip at play time
-            up = Upstream(info)
-            try:
-                up.total_size()
-            finally:
-                up.close()
+        _, up, _ = open_audio(vid)  # also learns the file size and warms a connection
+        up.close()
     finally:
         _prepare_slots.release()
 
@@ -421,9 +440,10 @@ def api_prepare(q):
     vid = (q.get("id") or [""])[0]
     hit = cache.get("audio:" + vid) if VIDEO_ID.match(vid) else True
     if not hit or (isinstance(hit, dict) and not hit.get("size")):
-        if _prepare_slots.acquire(blocking=False):
-            threading.Thread(target=lambda: _quiet(_prepare, vid), daemon=True).start()
-    return {"ok": True}
+        if not _prepare_slots.acquire(blocking=False):
+            return {"ok": True, "queued": False}  # busy: the app may ask again later
+        threading.Thread(target=lambda: _quiet(_prepare, vid), daemon=True).start()
+    return {"ok": True, "queued": True}
 
 
 # --------------------------------------------------------------------------- #
@@ -787,7 +807,7 @@ _inflight: dict = {}
 _inflight_lock = threading.Lock()
 
 
-def resolve_audio(vid: str, fresh: bool = False) -> dict:
+def resolve_audio(vid: str, fresh: bool = False, full: bool = False) -> dict:
     """Audio link for a song. If the same song is already being looked up (e.g. it was
     prepared in the background and then tapped), wait for that lookup instead of
     starting a second one."""
@@ -809,7 +829,7 @@ def resolve_audio(vid: str, fresh: bool = False) -> dict:
             return pending["result"]
         raise pending["error"] or RuntimeError("audio lookup timed out")
     try:
-        pending["result"] = _resolve_audio(vid, key)
+        pending["result"] = _resolve_audio(vid, key, full)
         return pending["result"]
     except Exception as e:
         pending["error"] = e
@@ -821,10 +841,43 @@ def resolve_audio(vid: str, fresh: bool = False) -> dict:
                 del _inflight[vid]
 
 
-def _resolve_audio(vid: str, key: str) -> dict:
+# Fast path: one YouTube client that needs no JavaScript solving, and no extra page /
+# manifest downloads. If it doesn't give a usable audio link, the normal (slower,
+# complete) yt-dlp setup is used. After 3 misses in a row the fast path rests 30 min.
+FAST_ARGS = {"youtube": {"player_client": ["visionos"], "player_skip": ["webpage", "configs"], "skip": ["dash", "hls", "translated_subs"]}}
+_fast = {"misses": 0, "off_until": 0.0}
+
+
+def _log(msg: str):
+    sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), msg))
+
+
+def _extract(vid: str, extractor_args: dict | None):
     opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
+    if extractor_args:
+        opts["extractor_args"] = extractor_args
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
+        return ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
+
+
+def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
+    t0 = time.time()
+    info, path = None, "full"
+    if not full and time.time() >= _fast["off_until"]:
+        try:
+            info = _extract(vid, FAST_ARGS)
+            if not (info.get("url") or info.get("requested_formats")):
+                raise RuntimeError("no audio")
+            path = "fast"
+            _fast["misses"] = 0
+        except Exception:
+            info = None
+            _fast["misses"] += 1
+            if _fast["misses"] >= 3:
+                _fast.update(misses=0, off_until=time.time() + 1800)
+                _log("audio: fast lookup not working right now, using the full one for 30 min")
+    if info is None:
+        info = _extract(vid, None)
     fmt = info
     if not info.get("url") and info.get("requested_formats"):
         fmt = info["requested_formats"][0]
@@ -834,10 +887,53 @@ def _resolve_audio(vid: str, key: str) -> dict:
         "ext": fmt.get("ext") or "m4a",
         "title": info.get("title") or vid,
         "size": int(fmt.get("filesize") or 0),  # total bytes; looked up on first request if missing
+        "path": path,
     }
     # URL audio YouTube berlaku ±6 jam; simpan sedikit lebih singkat.
-    cache.set(key, data, 4 * 3600)
+    ttl = 4 * 3600
+    m = re.search(r"[?&]expire=(\d+)", data["url"])
+    if m:
+        ttl = max(60, min(ttl, int(m.group(1)) - time.time() - 30 * 60))
+    cache.set(key, data, ttl)
+    _disk_save(vid, data, time.time() + ttl)
+    _log(f"audio link for {vid}: {time.time() - t0:.1f} s ({path})")
     return data
+
+
+# Links are also kept on disk, so songs found earlier start right away after a restart.
+DISK_CACHE = Path(__file__).resolve().parent / ".cache" / "audio-links.json"
+_disk: dict = {}
+_disk_lock = threading.Lock()
+
+
+def _disk_load():
+    try:
+        raw = json.loads(DISK_CACHE.read_text("utf-8"))
+    except (OSError, ValueError):
+        return
+    now = time.time()
+    for vid, (data, until) in raw.items():
+        if until - now > 120 and VIDEO_ID.match(vid):
+            _disk[vid] = (data, until)
+            cache.set("audio:" + vid, data, until - now)
+
+
+def _disk_save(vid: str, data: dict, until: float):
+    with _disk_lock:
+        now = time.time()
+        _disk[vid] = (data, until)
+        for k in [k for k, (_, u) in _disk.items() if u < now]:
+            del _disk[k]
+        if len(_disk) > 400:
+            for k in sorted(_disk, key=lambda k: _disk[k][1])[: len(_disk) - 400]:
+                del _disk[k]
+        try:
+            DISK_CACHE.parent.mkdir(exist_ok=True)
+            tmp = DISK_CACHE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(_disk), "utf-8")
+            os.replace(tmp, DISK_CACHE)
+        except OSError:
+            pass
 
 
 # --------------------------------------------------------------------------- #
@@ -964,15 +1060,8 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("id lagu tidak valid")
         download = (query.get("download") or ["0"])[0] == "1"
 
-        info = resolve_audio(vid)
-        up = Upstream(info)
-        try:
-            total = up.total_size()
-        except UpstreamExpired:
-            cache.drop("audio:" + vid)
-            info = resolve_audio(vid, fresh=True)
-            up = Upstream(info)
-            total = up.total_size()
+        t0 = time.time()
+        info, up, total = open_audio(vid)
 
         start, end, partial = 0, total - 1, False
         rng = self.headers.get("Range", "")
@@ -1010,12 +1099,17 @@ class Handler(BaseHTTPRequestHandler):
             pos = start
             chunk = FIRST_CHUNK
             renewed = False
+            first = True
             while pos <= end:
                 stop = min(pos + chunk - 1, end)
                 try:
                     for data in up.read_range(pos, stop):
                         self.wfile.write(data)
                         pos += len(data)
+                        if first:
+                            first = False
+                            if end - start > 1:
+                                _log(f"audio {vid} from {start}: first sound sent after {time.time() - t0:.2f} s")
                 except UpstreamExpired:
                     if renewed:
                         raise
@@ -1023,7 +1117,7 @@ class Handler(BaseHTTPRequestHandler):
                     renewed = True
                     up.close()
                     cache.drop("audio:" + vid)
-                    up = Upstream(resolve_audio(vid, fresh=True))
+                    up = Upstream(resolve_audio(vid, fresh=True, full=True))
                     continue
                 chunk = CHUNK
         finally:
@@ -1038,8 +1132,38 @@ class UpstreamExpired(Exception):
     """The YouTube audio URL is no longer valid (403/410)."""
 
 
+_pool: dict = {}
+_pool_lock = threading.Lock()
+POOL_IDLE = 25  # seconds a spare connection is kept for the next request
+
+
+def _pool_get(key):
+    with _pool_lock:
+        conns = _pool.get(key) or []
+        while conns:
+            conn, since = conns.pop()
+            if time.time() - since < POOL_IDLE:
+                return conn
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return None
+
+
+def _pool_put(key, conn):
+    with _pool_lock:
+        conns = _pool.setdefault(key, [])
+        if len(conns) < 4:
+            conns.append((conn, time.time()))
+            return
+    conn.close()
+
+
 class Upstream:
-    """One reusable connection to the audio host, fetching byte ranges."""
+    """One reusable connection to the audio host, fetching byte ranges. Finished
+    connections go back to a small pool, so the next request (Safari sends several
+    per song, and the next song often lives on the same host) skips the TLS handshake."""
 
     def __init__(self, info: dict):
         self.info = info
@@ -1048,9 +1172,12 @@ class Upstream:
         self.host = u.netloc
         self.path = u.path + ("?" + u.query if u.query else "")
         self.conn = None
+        self.clean = True  # the connection has no unread response on it
         self.content_type = "audio/mp4" if info["ext"] == "m4a" else "audio/webm"
 
     def _connect(self):
+        if self.conn is None:
+            self.conn = _pool_get((self.https, self.host))
         if self.conn is None:
             if self.https:
                 self.conn = http.client.HTTPSConnection(self.host, timeout=20, context=SSL_CONTEXT)
@@ -1064,6 +1191,7 @@ class Upstream:
         for attempt in range(3):
             try:
                 conn = self._connect()
+                self.clean = False
                 conn.request("GET", self.path, headers=headers)
                 resp = conn.getresponse()
             except (http.client.HTTPException, OSError):
@@ -1073,9 +1201,11 @@ class Upstream:
                 continue
             if resp.status in (403, 410):
                 resp.read()
+                self.clean = True
                 raise UpstreamExpired()
             if resp.status not in (200, 206):
                 resp.read()
+                self.clean = True
                 raise RuntimeError(f"audio host answered {resp.status}")
             ctype = resp.getheader("Content-Type") or ""
             if ctype:
@@ -1088,6 +1218,7 @@ class Upstream:
             return self.info["size"]
         resp = self._request(0, 0)
         resp.read()
+        self.clean = True
         cr = resp.getheader("Content-Range") or ""
         m = re.search(r"/(\d+)$", cr)
         size = int(m.group(1)) if m else int(resp.getheader("Content-Length") or 0)
@@ -1102,15 +1233,19 @@ class Upstream:
             # read1: pass on whatever has arrived instead of waiting for a full block
             data = resp.read1(64 * 1024)
             if not data:
+                self.clean = resp.isclosed() or resp.length in (0, None)
                 break
             yield data
 
     def close(self):
         if self.conn is not None:
-            try:
-                self.conn.close()
-            except Exception:
-                pass
+            if self.clean:
+                _pool_put((self.https, self.host), self.conn)  # reuse for the next request
+            else:
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
             self.conn = None
 
 
@@ -1133,6 +1268,7 @@ def main():
     ap.add_argument("--port", type=int, default=int(os.environ.get("PM_PORT", "8080")))
     args = ap.parse_args()
 
+    _disk_load()
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
     print("=" * 56)
