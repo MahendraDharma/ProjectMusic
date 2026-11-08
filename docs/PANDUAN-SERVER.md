@@ -1,5 +1,7 @@
 # Panduan server pribadi ProjectMusic
 
+*English version: [SERVER-GUIDE.md](SERVER-GUIDE.md)*
+
 Server pribadi membuat ProjectMusic bisa memutar **lagu dari katalog YouTube Music**:
 tangga lagu Indonesia, pencarian, halaman artis, radio otomatis, lirik, dan unduh.
 
@@ -25,14 +27,46 @@ tangga lagu Indonesia, pencarian, halaman artis, radio otomatis, lirik, dan undu
 ### Mac
 1. Pasang **Python 3** dari <https://www.python.org/downloads/>.
 2. Unduh dan ekstrak ProjectMusic seperti di atas.
-3. Di folder `server`, **klik dua kali `start.command`**.
-   Kalau macOS menolak, klik kanan → **Open** → **Open**.
+3. Buka **Terminal**, lalu jalankan (sesuaikan lokasi foldernya):
+   ```bash
+   cd ~/Downloads/ProjectMusic-main && sh server/start.sh
+   ```
+   Atau klik dua kali `server/start.command` (kalau macOS menolak: klik kanan → **Open** → **Open**).
 4. Buka <http://localhost:8080>.
 
-### Linux
-```bash
-sh server/start.sh
-```
+### Linux (Ubuntu, Debian, Fedora, Arch, Mint, dan lainnya)
+1. Pastikan Python 3.10+ terpasang. Kalau ada yang kurang, installer menampilkan perintah yang tepat untuk
+   distro Anda, misalnya di Ubuntu/Debian:
+   ```bash
+   sudo apt install python3 python3-venv python3-pip
+   ```
+2. Unduh ProjectMusic (tombol hijau **Code → Download ZIP**, lalu ekstrak), atau clone:
+   ```bash
+   git clone https://github.com/MahendraDharma/ProjectMusic
+   ```
+3. Pasang untuk akun Anda (tanpa sudo). Ini menambahkan **ProjectMusic** ke menu aplikasi lengkap dengan ikonnya:
+   ```bash
+   sh ProjectMusic/server/install-linux.sh
+   ```
+   Ingin server menyala otomatis setiap kali login? Pakai perintah ini:
+   ```bash
+   sh ProjectMusic/server/install-linux.sh --autostart
+   ```
+4. Buka **ProjectMusic** dari menu aplikasi (GNOME, KDE, Xfce, Cinnamon, dll.). Server menyala di latar
+   belakang dan browser membuka <http://localhost:8080>. Di Chrome/Edge, tekan **Install** di bilah alamat
+   supaya terbuka di jendela sendiri.
+
+Perintah berguna:
+
+| Untuk | Perintah |
+|---|---|
+| Menyalakan tanpa menu | `sh ProjectMusic/server/linux-launch.sh` |
+| Menjalankan di terminal (lihat log) | `sh ProjectMusic/server/start.sh` |
+| Menghentikan layanan autostart | `systemctl --user stop projectmusic` |
+| Menghapus menu dan autostart | `sh ProjectMusic/server/install-linux.sh --uninstall` |
+
+Dengan `--autostart`, server berjalan sebagai layanan systemd milik pengguna bila tersedia (log:
+`journalctl --user -u projectmusic`), atau lewat autostart desktop. Log peluncur ada di `server/server.log`.
 
 ## 2. HP Android (lewat Termux)
 
@@ -74,6 +108,19 @@ Saat server jalan, layarnya menampilkan alamat seperti:
 Lalu jadikan aplikasi:
 - **iPhone (Safari):** tombol Share → **Add to Home Screen**.
 - **Android (Chrome):** menu ⋮ → **Tambahkan ke layar utama**.
+
+## 4. Memakai link GitHub (tanpa mengetik localhost)
+
+Saat server menyala, link **https://mahendradharma.github.io/ProjectMusic/** di perangkat
+yang sama otomatis tersambung ke server dan menampilkan lagu YouTube Music.
+Kalau server mati, link itu kembali ke musik indie Audius.
+
+- Pakai **Chrome, Edge, atau Firefox**. Kalau muncul pertanyaan *"izinkan mengakses perangkat
+  di jaringan lokal?"*, pilih **Izinkan**.
+- **Safari** bisa memblokir sambungan dari situs HTTPS ke `localhost`. Kalau di Safari tetap
+  muncul lagu Audius, buka `http://localhost:8080` saja, atau pakai Chrome.
+- Alamat server bisa diganti di **Pengaturan (ikon slider) → Alamat server**.
+- Bahasa aplikasi bisa diganti ke Bahasa Indonesia di **Pengaturan → Bahasa**.
 
 ## Kalau ada masalah
 

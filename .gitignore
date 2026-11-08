@@ -3,3 +3,5 @@ node_modules/
 *.log
 .venv/
 __pycache__/
+server/server.log
+public/download/

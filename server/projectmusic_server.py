@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -42,11 +43,38 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
 USER_AGENT = "ProjectMusic/" + VERSION
+
+# Situs yang boleh memakai server ini dari browser (CORS). Hanya tampilan ProjectMusic
+# di GitHub Pages milik Anda + localhost; situs lain ditolak supaya server tidak
+# disalahgunakan. Tambah alamat lain lewat PM_ALLOWED_ORIGINS (pisahkan dengan koma).
+ALLOWED_ORIGINS = {"https://mahendradharma.github.io"} | {
+    o.strip().rstrip("/") for o in os.environ.get("PM_ALLOWED_ORIGINS", "").split(",") if o.strip()
+}
+LOCAL_ORIGIN = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+
+
+def origin_allowed(origin: str | None) -> bool:
+    return bool(origin) and (origin in ALLOWED_ORIGINS or bool(LOCAL_ORIGIN.match(origin)))
+
+# Python dari python.org di Mac tidak memakai sertifikat sistem, sehingga HTTPS bisa
+# gagal (CERTIFICATE_VERIFY_FAILED). Pakai paket certifi (ikut terpasang bersama yt-dlp).
+try:
+    import certifi
+
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except ImportError:  # pragma: no cover
+    SSL_CONTEXT = ssl.create_default_context()
+_opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=SSL_CONTEXT))
+
+
+def urlopen(req, timeout):
+    return _opener.open(req, timeout=timeout)
+
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/javascript", ".js")
@@ -127,6 +155,30 @@ def _art(thumbs, size: int) -> str:
     return url
 
 
+_NOISE = re.compile(
+    r"\s*[\(\[][^)\]]*(official|lyric|lirik|video|audio|live|mv|visualizer|music video)[^)\]]*[\)\]]",
+    re.I,
+)
+
+
+def clean_title(title: str, artist: str) -> str:
+    """Rapikan judul gaya YouTube: buang "(Official Video)", nama artis di depan/belakang,
+    dan ubah judul HURUF BESAR SEMUA menjadi Title Case."""
+    t = _NOISE.sub("", title or "").strip()
+    first = (artist or "").split(",")[0].strip().lower()
+    m = re.match(r"^(.+?)\s+[-\u2013\u2014|]\s+(.+)$", t)
+    if m and first:
+        left, right = m.group(1).strip(), m.group(2).strip()
+        if first in left.lower():
+            t = right
+        elif first in right.lower():
+            t = left
+    t = t.strip(" -|")
+    if len(t) > 4 and t.upper() == t and any(c.isalpha() for c in t):
+        t = t.title()
+    return t or (title or "")
+
+
 def track(item: dict) -> dict | None:
     vid = item.get("videoId")
     if not vid:
@@ -140,8 +192,9 @@ def track(item: dict) -> dict | None:
         "id": "yt:" + vid,
         "videoId": vid,
         "source": "ytmusic",
-        "title": item.get("title") or "Tanpa judul",
-        "artist": artist or "Tidak diketahui",
+        "title": clean_title(item.get("title") or "", artist) or "Untitled",
+        "rawTitle": item.get("title") or "",
+        "artist": artist or "Unknown artist",
         "album": album.get("name") if isinstance(album, dict) else None,
         "artwork": _art(thumbs, 120),
         "artworkLarge": _art(thumbs, 544),
@@ -306,7 +359,7 @@ def api_lyrics(q):
                     "https://lrclib.net/api/get?" + urllib.parse.urlencode(params),
                     headers={"User-Agent": USER_AGENT},
                 )
-                with urllib.request.urlopen(req, timeout=8) as r:
+                with urlopen(req, timeout=8) as r:
                     data = json.load(r)
                 if data.get("syncedLyrics"):
                     result.update(synced=_lrc_lines(data["syncedLyrics"]), source="LRCLIB")
@@ -396,6 +449,29 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "ProjectMusic/" + VERSION
     protocol_version = "HTTP/1.1"
 
+    def end_headers(self):
+        # Izinkan tampilan ProjectMusic di GitHub Pages memanggil server ini.
+        origin = self.headers.get("Origin")
+        if origin_allowed(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Vary", "Origin")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        # Pemeriksaan awal browser sebelum situs HTTPS memanggil server di jaringan lokal.
+        if not origin_allowed(self.headers.get("Origin")):
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def log_message(self, fmt, *args):  # log ringkas
         sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
@@ -420,6 +496,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/stream":
                 return self._stream(query)
+            if path == "/api/image":
+                return self._image(query)
             if path in API:
                 return self._send_json(200, API[path](query))
             if path.startswith("/api/"):
@@ -435,6 +513,29 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(502, {"error": "Gagal mengambil data dari YouTube Music.", "detail": str(e)[:300]})
             except Exception:
                 pass
+
+    # ---- gambar sampul (untuk kartu share di <canvas>) ------------------- #
+    def _image(self, query):
+        url = (query.get("url") or [""])[0]
+        host = urllib.parse.urlparse(url).hostname or ""
+        if not url.startswith("https://") or not (
+            host == "i.ytimg.com" or host.endswith(".googleusercontent.com") or host.endswith(".ggpht.com")
+        ):
+            raise ValueError("Alamat gambar tidak diizinkan")
+        cached_img = cache.get("img:" + url)
+        if cached_img is None:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urlopen(req, timeout=10) as r:
+                cached_img = (r.headers.get("Content-Type") or "image/jpeg", r.read(3_000_000))
+            cache.set("img:" + url, cached_img, 3600)
+        ctype, data = cached_img
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     # ---- file statis (tampilan web) ------------------------------------- #
     def _static(self, path: str):
@@ -467,7 +568,7 @@ class Handler(BaseHTTPRequestHandler):
                 headers["Range"] = self.headers["Range"]
             req = urllib.request.Request(info["url"], headers=headers, method=self.command)
             try:
-                upstream = urllib.request.urlopen(req, timeout=20)
+                upstream = urlopen(req, timeout=20)
                 break
             except urllib.error.HTTPError as e:
                 if e.code == 416:  # range di luar batas

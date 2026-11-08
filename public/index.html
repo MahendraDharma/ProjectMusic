@@ -1,93 +1,36 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#121212">
-  <!-- Jangan kirim alamat halaman ke server gambar/lagu pihak lain (privasi + mencegah gambar ditolak) -->
+  <meta name="theme-color" content="#0D0E10">
+  <!-- Don't send this page's address to image/music hosts (privacy, and some refuse it) -->
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="ProjectMusic — pemutar musik web gratis, ringan, dan open source.">
+  <meta name="description" content="ProjectMusic — a free, lightweight, open-source music player for the web.">
   <title>ProjectMusic</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preload" href="fonts/DMSans-500.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Ikon SVG dipakai ulang lewat <use href="#i-..."> supaya tidak perlu library ikon -->
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
-    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></symbol>
-    <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm9-12v12h2V6h-2z"/></symbol>
-    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></symbol>
-    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M10.6 9.2L5.4 4 4 5.4l5.2 5.2 1.4-1.4zM14.5 4l2 2L4 18.6 5.4 20 18 7.5l2 2V4h-5.5zm.3 9.4l-1.4 1.4 3.1 3.1-2 2.1H20v-5.5l-2 2-3.2-3.1z"/></symbol>
-    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></symbol>
-    <symbol id="i-repeat-one" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></symbol>
-    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21.4l-1.5-1.3C5.4 15.4 2 12.3 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 3.8-3.4 6.9-8.5 11.5L12 21.4z"/></symbol>
-    <symbol id="i-heart-o" viewBox="0 0 24 24"><path d="M16.5 3c-1.7 0-3.4.8-4.5 2.1C10.9 3.8 9.2 3 7.5 3 4.4 3 2 5.4 2 8.5c0 3.8 3.4 6.9 8.5 11.5l1.5 1.4 1.5-1.4C18.6 15.4 22 12.3 22 8.5 22 5.4 19.6 3 16.5 3zm-4.4 15.6l-.1.1-.1-.1C7.1 14.2 4 11.4 4 8.5 4 6.5 5.5 5 7.5 5c1.5 0 3 1 3.6 2.4h1.9C13.5 6 15 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.9-3.1 5.7-7.9 10.1z"/></symbol>
-    <symbol id="i-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
-    <symbol id="i-home" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></symbol>
-    <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16c1.6 0 3.1-.6 4.2-1.6l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0C7 14 5 12 5 9.5S7 5 9.5 5 14 7 14 9.5 12 14 9.5 14z"/></symbol>
-    <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"/></symbol>
-    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M10 4H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></symbol>
-    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M3 10h11v2H3zm0-4h11v2H3zm0 8h7v2H3zm13-1v8l6-4z"/></symbol>
-    <symbol id="i-down" viewBox="0 0 24 24"><path d="M7.4 8.6L12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></symbol>
-    <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.4L17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></symbol>
-    <symbol id="i-note" viewBox="0 0 24 24"><path d="M12 3v10.6A4 4 0 1 0 14 17V7h4V3h-6z"/></symbol>
-  </svg>
-
-  <header class="topbar">
-    <a href="#/" class="brand"><svg class="ic"><use href="#i-note"/></svg> ProjectMusic</a>
-  </header>
-
-  <main id="view" class="view" tabindex="-1"></main>
-
-  <!-- Mini player: selalu terlihat saat ada lagu -->
-  <div id="mini" class="mini" hidden>
-    <div class="mini-progress"><div id="mini-bar"></div></div>
-    <button id="mini-open" class="mini-info" aria-label="Buka pemutar">
-      <img id="mini-art" alt="" width="44" height="44">
-      <span class="mini-text"><b id="mini-title"></b><small id="mini-artist"></small></span>
-    </button>
-    <button id="mini-toggle" class="icon-btn" aria-label="Putar/Jeda"><svg class="ic"><use href="#i-play"/></svg></button>
-    <button id="mini-next" class="icon-btn" aria-label="Berikutnya"><svg class="ic"><use href="#i-next"/></svg></button>
+  <div class="app">
+    <aside id="side" class="side" aria-label="Sidebar"></aside>
+    <main id="view" class="view" tabindex="-1"></main>
+    <aside id="panel" class="panel" aria-label="Queue and lyrics"></aside>
   </div>
 
-  <nav class="tabbar" aria-label="Navigasi utama">
-    <a href="#/" data-tab="home"><svg class="ic"><use href="#i-home"/></svg><span>Beranda</span></a>
-    <a href="#/search" data-tab="search"><svg class="ic"><use href="#i-search"/></svg><span>Cari</span></a>
-    <a href="#/library" data-tab="library"><svg class="ic"><use href="#i-library"/></svg><span>Koleksi</span></a>
-    <a href="#/local" data-tab="local"><svg class="ic"><use href="#i-folder"/></svg><span>Lokal</span></a>
-    <a href="#/queue" data-tab="queue"><svg class="ic"><use href="#i-queue"/></svg><span>Antrean</span></a>
-  </nav>
+  <div id="mini" class="mini" aria-label="Mini player"></div>
+  <div id="bar" class="bar" aria-label="Player"></div>
+  <nav id="tabbar" class="tabbar" aria-label="Main"></nav>
 
-  <!-- Layar "Sedang diputar" -->
-  <section id="np" class="np" hidden aria-label="Sedang diputar">
-    <button id="np-close" class="icon-btn np-close" aria-label="Tutup"><svg class="ic"><use href="#i-down"/></svg></button>
-    <img id="np-art" class="np-art" alt="">
-    <div class="np-meta">
-      <div class="np-text"><h2 id="np-title"></h2><p id="np-artist"></p></div>
-      <button id="np-fav" class="icon-btn" aria-label="Favorit"><svg class="ic"><use href="#i-heart-o"/></svg></button>
-    </div>
-    <input id="np-seek" class="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Posisi lagu">
-    <div class="np-times"><span id="np-cur">0:00</span><span id="np-dur">0:00</span></div>
-    <div class="np-controls">
-      <button id="np-shuffle" class="icon-btn" aria-label="Acak"><svg class="ic"><use href="#i-shuffle"/></svg></button>
-      <button id="np-prev" class="icon-btn big" aria-label="Sebelumnya"><svg class="ic"><use href="#i-prev"/></svg></button>
-      <button id="np-toggle" class="play-btn" aria-label="Putar/Jeda"><svg class="ic"><use href="#i-play"/></svg></button>
-      <button id="np-next" class="icon-btn big" aria-label="Berikutnya"><svg class="ic"><use href="#i-next"/></svg></button>
-      <button id="np-repeat" class="icon-btn" aria-label="Ulangi"><svg class="ic"><use href="#i-repeat"/></svg></button>
-    </div>
-    <div class="np-extra">
-      <button id="np-lyrics-btn" class="pill" hidden>Lirik</button>
-      <a id="np-download" class="pill" hidden download>Unduh</a>
-      <button id="np-sleep" class="pill">Sleep: mati</button>
-    </div>
-    <div id="np-lyrics" class="lyrics" hidden aria-live="off"></div>
-    <p id="np-source" class="np-source"></p>
-  </section>
-
+  <section id="np" class="np" hidden aria-label="Now playing"></section>
+  <div id="sheet-root" class="sheet-root" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="drop" class="drop" aria-hidden="true"></div>
+  <input id="file-input" type="file" accept="audio/*" multiple hidden>
 
   <script type="module" src="js/app.js"></script>
 </body>

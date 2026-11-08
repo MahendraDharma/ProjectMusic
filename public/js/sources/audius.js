@@ -24,8 +24,8 @@ export function normalize(t) {
   return {
     id: 'audius:' + t.id,
     source: 'audius',
-    title: t.title || 'Tanpa judul',
-    artist: (t.user && t.user.name) || 'Tidak diketahui',
+    title: t.title || 'Untitled',
+    artist: (t.user && t.user.name) || 'Unknown artist',
     artwork: art['150x150'] || '',
     artworkLarge: art['480x480'] || art['150x150'] || '',
     duration: t.duration || 0,
