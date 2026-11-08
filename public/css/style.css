@@ -157,6 +157,11 @@ h1, h2, h3, p { margin: 0; }
 .lib-ic.round { border-radius: 50%; }
 .server-card, .notice { display: flex; align-items: center; gap: 12px; margin: 18px 0; padding: 14px; border-radius: 12px; background: var(--card); }
 .notice { margin: 4px 0 6px; }
+.notice.safari { align-items: flex-start; }
+.notice .row-text.wrap b, .notice .row-text.wrap small { white-space: normal; }
+.notice .row-text.wrap small { margin-top: 2px; }
+.notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dot.warn { background: #FF9F0A; margin-top: 6px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
 .dot.off { background: var(--ink3); }
 .status-line { display: flex; align-items: center; gap: 10px; }
