@@ -1,7 +1,7 @@
 // ProjectMusic app shell: routing, pages, mini player / desktop bar, Now Playing,
 // lyrics, song menu, share cards and settings. Plain DOM, no framework.
 import { player } from './player.js';
-import { favs, history as recents, prefs, recentSearches, persistable } from './store.js';
+import { favs, history as recents, prefs, recentSearches, persistable, playlists } from './store.js';
 import { t, lang } from './i18n.js';
 import { h, icon, setIcon, logo, fmt, toast, openSheet, closeSheet, skeletonRows, skeletonCards } from './ui.js';
 import * as audius from './sources/audius.js';
@@ -70,7 +70,7 @@ function isCurrent(track) {
   return !!(c && track && c.id === track.id);
 }
 
-function trackRow(track, list, index, { onPlay, onRemove, number } = {}) {
+function trackRow(track, list, index, { onPlay, onRemove, onMore, number } = {}) {
   const play = () => (onPlay ? onPlay(index) : player.playList(list, index));
   return h('div', { class: 'row' + (isCurrent(track) ? ' playing' : ''), dataset: { id: track.id } },
     number ? h('span', { class: 'row-num' }, index + 1) : null,
@@ -81,7 +81,7 @@ function trackRow(track, list, index, { onPlay, onRemove, number } = {}) {
         h('small', {}, [track.artist, track.duration ? fmt(track.duration) : null].filter(Boolean).join(' · ')))),
     onRemove
       ? h('button', { class: 'icon-btn', 'aria-label': t('remove'), onclick: () => onRemove(index) }, icon('close', 20))
-      : h('button', { class: 'icon-btn', 'aria-label': t('moreOptions'), onclick: () => songSheet(track) }, icon('more', 22)));
+      : h('button', { class: 'icon-btn', 'aria-label': t('moreOptions'), onclick: () => (onMore ? onMore(track, index) : songSheet(track)) }, icon('more', 22)));
 }
 
 function trackList(tracks, opts) {
@@ -112,7 +112,7 @@ function artistRow(list) {
 /* =====================================================================
    Song menu (bottom sheet)
    ===================================================================== */
-function songSheet(track) {
+function songSheet(track, ctx = null) {
   const liked = favs.has(track.id);
   const act = (ic, label, fn, visible = true) => visible && h('button', { class: 'sheet-act', onclick: () => { closeSheet(); fn(); } }, icon(ic), h('span', {}, label));
   openSheet([
@@ -120,12 +120,57 @@ function songSheet(track) {
     act('playNext', t('playNext'), () => { player.playNext(track); toast(t('playingNext')); }),
     act('addQueue', t('addToQueue'), () => { player.addToQueue(track); toast(t('addedToQueue')); }),
     act(liked ? 'heartFill' : 'heart', liked ? t('removeLiked') : t('addLiked'), () => toggleLike(track), persistable(track)),
+    act('playlist', t('addToPlaylist'), () => addToPlaylistSheet(track), persistable(track)),
+    ctx && act('trash', t('removeFromPlaylist'), () => { playlists.removeAt(ctx.playlistId, ctx.index); toast(t('removed')); render(); }),
     act('radio', t('startRadio'), () => startRadio(track), !!(server && track.source === 'ytmusic')),
     act('user', t('goToArtist'), () => go('#/search?q=' + encodeURIComponent(track.artist.split(',')[0])), track.source !== 'local'),
     act('mix', t('mixWith'), () => { mixPreset = { A: player.current && player.current.id !== track.id ? player.current : null, B: track }; go('#/mix'); }),
     act('share', t('share'), () => openSharePreview('song', [], track), track.source !== 'local'),
     act('download', t('download'), () => downloadTrack(track), !!(server && track.source === 'ytmusic')),
   ], { label: t('moreOptions') });
+}
+
+/* ---------- Your playlists ---------- */
+function playlistArt(pl, cls = 'lib-ic') {
+  const src = pl.cover || pl.tracks.find((tr) => tr.artworkLarge || tr.artwork)?.artworkLarge || pl.tracks.find((tr) => tr.artwork)?.artwork;
+  return src ? h('img', { class: cls, src, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : h('span', { class: cls + ' art-ph' }, icon('playlist', 24));
+}
+
+function nameSheet(title, value, onSave) {
+  const input = h('input', { class: 'text-input', id: 'pl-name', value, autocomplete: 'off', maxlength: 80 });
+  const submit = (e) => { e.preventDefault(); const v = input.value.trim(); if (!v) return input.focus(); closeSheet(); onSave(v); };
+  openSheet(h('form', { class: 'name-form', onsubmit: submit },
+    h('h2', { class: 'sheet-title' }, title),
+    h('label', { class: 'small-label', for: 'pl-name' }, t('playlistName')), input,
+    h('div', { class: 'row-actions end' },
+      h('button', { class: 'btn', type: 'button', onclick: () => closeSheet() }, t('cancel')),
+      h('button', { class: 'btn primary', type: 'submit' }, t('save')))), { label: title });
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+function addToPlaylistSheet(track) {
+  const pick = (pl) => {
+    closeSheet();
+    toast(playlists.add(pl.id, track) ? t('addedTo', { name: pl.name }) : t('alreadyIn', { name: pl.name }));
+    renderSideStatus();
+    if (currentRoute === 'library' || currentRoute === 'mine') render();
+  };
+  openSheet([
+    h('h2', { class: 'sheet-title' }, t('addToPlaylist')),
+    h('button', { class: 'sheet-act', onclick: () => nameSheet(t('newPlaylist'), '', (name) => {
+      const pl = playlists.create({ name, tracks: [track] });
+      toast(t('addedTo', { name: pl.name }));
+      renderSideStatus();
+      if (currentRoute === 'library') render();
+    }) }, icon('plus'), h('span', {}, t('newPlaylist'))),
+    ...playlists.all().map((pl) => h('button', { class: 'sheet-act', onclick: () => pick(pl) }, playlistArt(pl, 'sheet-art'),
+      h('span', { class: 'row-text' }, h('b', {}, pl.name), h('small', {}, t('songs', { n: pl.tracks.length }))))),
+  ], { label: t('addToPlaylist') });
+}
+
+function playlistRow(pl) {
+  return h('a', { class: 'lib-row', href: '#/mine?id=' + encodeURIComponent(pl.id) }, playlistArt(pl),
+    h('span', { class: 'row-text' }, h('b', {}, pl.name), h('small', {}, [t('playlist'), t('songs', { n: pl.tracks.length })].join(' · '))));
 }
 
 function toggleLike(track) {
@@ -344,6 +389,11 @@ const pages = {
       libRow('heartFill', 'fav', t('likedSongs'), t('songs', { n: favs.all().length }), '#/library?f=liked'),
       libRow('clock', '', t('recentlyPlayed'), t('songs', { n: recents.all().length }), '#/library?f=history'),
       libRow('folder', '', t('filesOnDevice'), t('pickFiles'), '#/library?f=local'),
+      h('h3', { class: 'label' }, t('playlists')),
+      libRow('import', 'imp', t('importPlaylist'), 'YouTube Music · Spotify · Apple Music · Deezer', '#/import'),
+      playlists.all().map(playlistRow),
+      h('button', { class: 'lib-row', onclick: () => nameSheet(t('newPlaylist'), '', (name) => { const pl = playlists.create({ name }); go('#/mine?id=' + encodeURIComponent(pl.id)); }) },
+        h('span', { class: 'lib-ic' }, icon('plus', 26)), h('span', { class: 'row-text' }, h('b', {}, t('newPlaylist')))),
       tops.length ? h('h3', { class: 'label' }, t('yourTopArtists')) : null,
       tops.map((a) => h('a', { class: 'lib-row', href: '#/search?q=' + encodeURIComponent(a.name) },
         a.seed.artwork ? h('img', { class: 'lib-ic round', src: a.seed.artwork, alt: '' }) : h('span', { class: 'lib-ic round' }, a.name[0]),
@@ -431,6 +481,50 @@ const pages = {
     }
   },
 
+  async import() {
+    pageAbort?.abort();
+    const { renderImport } = await import('./importer.js');
+    if (currentRoute !== 'import') return;
+    renderImport(view, {
+      server,
+      artEl,
+      go,
+      serverNotice: serverOffNotice,
+      back: { go: () => (history.length > 1 ? history.back() : go('#/library')), play: (list) => player.playList(list, 0) },
+    });
+  },
+
+  mine(params) {
+    const pl = playlists.get(params.get('id') || '');
+    if (!pl) return show(emptyState(t('loadFailed'), null, h('a', { class: 'btn', href: '#/library' }, t('library'))));
+    const list = pl.tracks;
+    const menu = () => openSheet([
+      h('h2', { class: 'sheet-title' }, pl.name),
+      h('button', { class: 'sheet-act', onclick: () => nameSheet(t('rename'), pl.name, (name) => { playlists.rename(pl.id, name); render(); }) }, icon('edit'), h('span', {}, t('rename'))),
+      pl.sourceUrl ? h('a', { class: 'sheet-act', href: pl.sourceUrl, target: '_blank', rel: 'noopener', onclick: () => closeSheet() }, icon('link'), h('span', {}, t('fromSource', { s: sourceName(pl.source) }))) : null,
+      h('button', { class: 'sheet-act danger', onclick: () => {
+        closeSheet();
+        if (!window.confirm(t('confirmDelete', { name: pl.name }))) return;
+        playlists.remove(pl.id);
+        toast(t('deleted'));
+        go('#/library');
+      } }, icon('trash'), h('span', {}, t('deletePlaylist'))),
+    ], { label: pl.name });
+    const sub = [pl.source ? t('fromSource', { s: sourceName(pl.source) }) : t('yourPlaylist'), t('songs', { n: list.length })];
+    const total = list.reduce((a, tr) => a + (tr.duration || 0), 0);
+    if (total > 60) sub.push(fmt(total));
+    show(
+      h('header', { class: 'page-head' }, h('button', { class: 'icon-btn', 'aria-label': t('back'), onclick: () => (history.length > 1 ? history.back() : go('#/library')) }, icon('back', 22))),
+      h('div', { class: 'hero pl-hero' }, playlistArt(pl, 'pl-cover'),
+        h('div', {}, h('small', { class: 'caps-label' }, t('playlist')), h('h1', {}, pl.name), h('p', { class: 'hint' }, sub.join(' · ')))),
+      h('div', { class: 'row-actions' },
+        h('button', { class: 'btn primary', disabled: !list.length, onclick: () => player.playList(list, 0) }, icon('play', 18), t('play')),
+        h('button', { class: 'btn', disabled: !list.length, onclick: () => { if (!player.shuffle) player.toggleShuffle(); player.playList(list, Math.floor(Math.random() * list.length)); } }, icon('shuffle', 18), t('shuffle')),
+        h('button', { class: 'icon-btn', 'aria-label': t('moreOptions'), onclick: menu }, icon('more', 22))),
+      list.length ? trackList(list, { onMore: (tr, i) => songSheet(tr, { playlistId: pl.id, index: i }) })
+        : emptyState(t('emptyPlaylist'), t('emptyPlaylistHint')));
+  },
+
   async mix() {
     pageAbort?.abort();
     const { renderMix } = await import('./mix.js');
@@ -444,6 +538,8 @@ const pages = {
     });
   },
 };
+
+const sourceName = (key) => ({ youtube: 'YouTube Music', spotify: 'Spotify', apple: 'Apple Music', deezer: 'Deezer' })[key] || t('textList');
 
 function pickTrackSheet(onPick) {
   const input = h('input', { class: 'field-input', type: 'search', placeholder: t('searchPlaceholder'), 'aria-label': t('search') });
@@ -515,7 +611,7 @@ function render() {
   const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
   const name = pages[path] ? path : 'home';
   currentRoute = name;
-  const tab = { artist: 'search', playlist: 'home', indie: 'home', settings: 'library' }[name] || name;
+  const tab = { artist: 'search', playlist: 'home', indie: 'home', settings: 'library', import: 'library', mine: 'library' }[name] || name;
   document.querySelectorAll('[data-tab]').forEach((a) => {
     const on = a.dataset.tab === tab;
     a.classList.toggle('on', on);
@@ -538,6 +634,7 @@ function buildChrome() {
     h('a', { class: 'side-lib', href: '#/library?f=liked' }, h('span', { class: 'lib-ic fav' }, icon('heartFill', 20)), h('span', { class: 'row-text' }, h('b', {}, t('likedSongs')), h('small', { id: 'side-liked' }, ''))),
     h('a', { class: 'side-lib', href: '#/library?f=history' }, h('span', { class: 'lib-ic' }, icon('clock', 20)), h('span', { class: 'row-text' }, h('b', {}, t('recentlyPlayed')), h('small', { id: 'side-recent' }, ''))),
     h('a', { class: 'side-lib', href: '#/library?f=local' }, h('span', { class: 'lib-ic' }, icon('folder', 20)), h('span', { class: 'row-text' }, h('b', {}, t('filesOnDevice')), h('small', {}, t('dropFiles')))),
+    h('div', { id: 'side-lists', class: 'side-lists' }),
     h('div', { id: 'side-status', class: 'side-status' }),
     h('a', { class: 'side-settings', href: '#/settings' }, icon('settings', 20), t('settings')),
   );
@@ -553,6 +650,10 @@ function buildChrome() {
 
 function renderSideStatus() {
   $('side-status')?.replaceChildren(serverCard());
+  $('side-lists')?.replaceChildren(
+    h('a', { class: 'side-lib', href: '#/import' }, h('span', { class: 'lib-ic imp' }, icon('import', 20)), h('span', { class: 'row-text' }, h('b', {}, t('importPlaylist')))),
+    ...playlists.all().slice(0, 30).map((pl) => h('a', { class: 'side-lib', href: '#/mine?id=' + encodeURIComponent(pl.id) }, playlistArt(pl),
+      h('span', { class: 'row-text' }, h('b', {}, pl.name), h('small', {}, t('songs', { n: pl.tracks.length }))))));
   const liked = $('side-liked');
   if (liked) liked.textContent = t('songs', { n: favs.all().length });
   const rec = $('side-recent');
