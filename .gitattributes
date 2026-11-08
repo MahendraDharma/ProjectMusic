@@ -1,0 +1,5 @@
+# Kept out of the downloadable ProjectMusic.zip (design files aren't needed to run the app)
+docs/desain export-ignore
+docs/logo-pilihan export-ignore
+.github export-ignore
+.gitattributes export-ignore

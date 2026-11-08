@@ -19,7 +19,8 @@ guide is available in [Indonesian](docs/PANDUAN-SERVER.md).*
 | Lyrics, radio, downloads, share cards | — | ✅ |
 | For | Anyone | **Personal use** |
 
-👉 **Server guide:** [English](docs/SERVER-GUIDE.md) · [Bahasa Indonesia](docs/PANDUAN-SERVER.md)
+👉 **Download & step-by-step setup:** <https://mahendradharma.github.io/ProjectMusic/get/>
+(also in the repo: [English](docs/SERVER-GUIDE.md) · [Bahasa Indonesia](docs/PANDUAN-SERVER.md))
 
 ## Features
 

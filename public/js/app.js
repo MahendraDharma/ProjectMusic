@@ -243,7 +243,7 @@ const pages = {
     show(
       homeHead(isHome ? greeting() : t('browseAudius'), isHome),
       isHome && quick.length ? quickGrid(quick) : null,
-      isHome ? h('a', { class: 'notice', href: '#/settings' }, h('span', { class: 'dot off' }), h('span', { class: 'row-text' }, h('b', {}, t('serverOff')), h('small', {}, t('serverOffHint')))) : null,
+      isHome ? h('a', { class: 'notice', href: 'get/' }, h('span', { class: 'dot off' }), h('span', { class: 'row-text' }, h('b', {}, t('serverOff')), h('small', {}, t('serverOffHint')))) : null,
       sectionHead(t('trendingWeek')), chips, listBox,
       h('p', { class: 'hint' }, t('audiusCredit')),
     );
@@ -377,7 +377,8 @@ const pages = {
           prefs.set('serverUrl', ytmusic.normalizeBase(input.value));
           const info = await connectServer();
           toast(info ? t('connected') : t('notFound'));
-        } }, t('reconnect')))),
+        } }, t('reconnect')),
+          h('a', { class: 'btn', href: 'get/' }, icon('download', 18), t('setupGuide')))),
       h('h3', { class: 'label caps' }, t('playback')),
       h('div', { class: 'panel-card list' },
         h('div', { class: 'setting static' }, h('span', { class: 'row-text' }, h('b', {}, t('crossfade')), h('small', {}, player.canFade ? t('crossfadeHint') : t('crossfadeIos'))), fadeLabel),
@@ -469,7 +470,7 @@ function serverStatusLine() {
 }
 
 function serverCard() {
-  return h('a', { class: 'server-card', href: '#/settings' }, h('span', { class: 'dot' + (server ? '' : ' off') }),
+  return h('a', { class: 'server-card', href: server ? '#/settings' : 'get/' }, h('span', { class: 'dot' + (server ? '' : ' off') }),
     h('span', { class: 'row-text' }, h('b', {}, server ? t('serverConnected') : t('serverOff')),
       h('small', {}, server ? `${server.base.replace(/\/$/, '')} · YouTube Music` : t('serverOffHint'))));
 }

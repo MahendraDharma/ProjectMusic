@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0D0E10">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Download ProjectMusic and set up your personal server for YouTube Music, lyrics and share cards.">
+  <title>Get ProjectMusic</title>
+  <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="get.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="../"><img src="../icons/icon.svg" alt="" width="30" height="30"> ProjectMusic</a>
+    <div class="lang" role="group" aria-label="Language">
+      <button data-lang="en" aria-pressed="true">English</button>
+      <button data-lang="id" aria-pressed="false">Bahasa Indonesia</button>
+    </div>
+  </header>
+
+  <!-- ===================================================== ENGLISH -->
+  <main lang="en" data-lang-block="en">
+    <section class="hero">
+      <h1>Your music, on your own server.</h1>
+      <p class="lead">ProjectMusic is free and open source. Download it, start the small server on your computer or Android phone, and this page becomes a full music app: YouTube Music catalogue, synced lyrics, share cards and more.</p>
+      <div class="status" data-status>
+        <span class="dot"></span>
+        <span class="status-text" data-status-text>Checking for your server…</span>
+        <a class="btn primary" data-open hidden href="../">Open ProjectMusic</a>
+      </div>
+      <div class="cta">
+        <a class="btn primary big" data-download href="../download/ProjectMusic.zip" download>Download ProjectMusic (.zip)</a>
+        <a class="btn" href="https://github.com/MahendraDharma/ProjectMusic/archive/refs/heads/main.zip">Alternative download (GitHub)</a>
+      </div>
+      <p class="meta" data-meta>Windows · Mac · Linux · Android (Termux) — about 1 MB</p>
+    </section>
+
+    <section>
+      <h2>Set it up — pick your device</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-os="windows">Windows</button>
+        <button role="tab" data-os="mac">Mac</button>
+        <button role="tab" data-os="linux">Linux</button>
+        <button role="tab" data-os="android">Android</button>
+        <button role="tab" data-os="iphone">iPhone / iPad</button>
+      </div>
+
+      <div class="os" data-os-panel="windows">
+        <ol class="steps">
+          <li><b>Install Python.</b> Get it from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a>. In the installer, tick <b>“Add python.exe to PATH”</b>, then click Install Now.</li>
+          <li><b>Download and unzip ProjectMusic</b> with the button above. Right-click the zip → <b>Extract All</b>.</li>
+          <li><b>Start the server.</b> Open the <code>ProjectMusic\server</code> folder and double-click <code>start.bat</code>. The first start takes about a minute. Keep that window open.</li>
+          <li><b>Open the app.</b> Come back to this page (it turns green) and press <b>Open ProjectMusic</b>, or go to <code>http://localhost:8080</code>.</li>
+        </ol>
+        <p class="note">Windows may show “Windows protected your PC” the first time: click <b>More info → Run anyway</b>. The script only sets up Python and starts the server.</p>
+      </div>
+
+      <div class="os" data-os-panel="mac">
+        <ol class="steps">
+          <li><b>Install Python.</b> Get the macOS installer from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a> and run it. At the end, double-click <b>Install Certificates.command</b> in the Python folder that opens.</li>
+          <li><b>Download ProjectMusic</b> with the button above and double-click the zip in Downloads to unpack it.</li>
+          <li><b>Start the server.</b> Open <b>Terminal</b> (⌘ Space, type Terminal) and run:
+            <pre><code>cd ~/Downloads/ProjectMusic && sh server/start.sh</code></pre>
+            The first start takes about a minute. Keep the Terminal window open.</li>
+          <li><b>Open the app.</b> Come back to this page and press <b>Open ProjectMusic</b>, or go to <code>http://localhost:8080</code>.</li>
+        </ol>
+        <p class="note">Next time, only step 3 is needed. Stop the server with <kbd>Control</kbd> + <kbd>C</kbd> in Terminal.</p>
+      </div>
+
+      <div class="os" data-os-panel="linux">
+        <ol class="steps">
+          <li><b>Make sure Python 3.10+ is installed.</b> On Ubuntu/Debian:
+            <pre><code>sudo apt install python3 python3-venv python3-pip</code></pre>
+            (Fedora: <code>sudo dnf install python3 python3-pip</code> · Arch: <code>sudo pacman -S python python-pip</code>)</li>
+          <li><b>Download and unzip ProjectMusic</b> with the button above, or clone it:
+            <pre><code>git clone https://github.com/MahendraDharma/ProjectMusic</code></pre></li>
+          <li><b>Install it to your app menu</b> (no sudo). Add <code>--autostart</code> to start the server at every login:
+            <pre><code>sh ProjectMusic/server/install-linux.sh --autostart</code></pre></li>
+          <li><b>Open ProjectMusic</b> from your app menu. The server starts in the background and the app opens in your browser.</li>
+        </ol>
+        <p class="note">Remove it again with <code>sh ProjectMusic/server/install-linux.sh --uninstall</code>.</p>
+      </div>
+
+      <div class="os" data-os-panel="android">
+        <ol class="steps">
+          <li><b>Install Termux</b> from <a href="https://f-droid.org/packages/com.termux/" target="_blank" rel="noopener">F-Droid</a> (the Play Store version is outdated).</li>
+          <li><b>In Termux, run these one at a time:</b>
+            <pre><code>pkg install -y python git</code></pre>
+            <pre><code>git clone https://github.com/MahendraDharma/ProjectMusic</code></pre>
+            <pre><code>sh ProjectMusic/server/start.sh</code></pre></li>
+          <li><b>Open the app</b> in Chrome on the same phone: come back to this page and press <b>Open ProjectMusic</b>, or go to <code>http://localhost:8080</code>.</li>
+          <li><b>Keep it running with the screen off:</b> pull down the Termux notification → <b>Acquire wakelock</b>.</li>
+        </ol>
+        <p class="note">An old Android phone on a charger makes a great always-on music server for the whole house.</p>
+      </div>
+
+      <div class="os" data-os-panel="iphone">
+        <p>iPhone and iPad can’t run the server themselves, but they can use one running on your computer or Android phone.</p>
+        <ol class="steps">
+          <li><b>Start the server</b> on a computer or Android phone (see the other tabs).</li>
+          <li><b>Same Wi-Fi:</b> the server window shows an address like <code>http://192.168.1.5:8080</code>. Open it in Safari.</li>
+          <li><b>Away from home:</b> install <a href="https://tailscale.com/download" target="_blank" rel="noopener">Tailscale</a> on both devices and sign in with the same account, then open <code>http://&lt;computer-name&gt;:8080</code>.</li>
+          <li><b>Make it an app:</b> Share → <b>Add to Home Screen</b>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>Using it every day</h2>
+      <div class="grid">
+        <div class="card"><h3>Open it from this website</h3><p>While the server runs, <a href="../">the ProjectMusic site</a> connects to it automatically on the same device. Use Chrome, Edge or Firefox and choose <b>Allow</b> if asked about the local network. In Safari, use <code>http://localhost:8080</code>.</p></div>
+        <div class="card"><h3>Install it like an app</h3><p>Chrome/Edge on a computer: <b>Install</b> icon in the address bar. Android Chrome: ⋮ → <b>Add to Home screen</b>. iPhone Safari: Share → <b>Add to Home Screen</b>.</p></div>
+        <div class="card"><h3>Without the server</h3><p>The site still works with indie music from Audius, your local files and your liked songs — no setup needed.</p></div>
+        <div class="card"><h3>Updating</h3><p>Download the zip again (or <code>git pull</code>). The start scripts also update the music library tools every time they run.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Troubleshooting</h2>
+      <details><summary>Songs are listed but won’t play</summary><p>Stop the server and start it again: the start script updates <code>yt-dlp</code>, which usually fixes it. Make sure you’re on home Wi-Fi or mobile data, not a VPN.</p></details>
+      <details><summary>“Sign in to confirm you’re not a bot”</summary><p>YouTube blocks servers in data centres and some VPNs. Run the server on a normal home connection.</p></details>
+      <details><summary>This page says the server isn’t running, but it is</summary><p>Safari blocks secure sites from talking to <code>localhost</code>: open <code>http://localhost:8080</code> directly, or use Chrome/Edge/Firefox and allow local network access. If you changed the port, set the address in the app under Settings → Server address.</p></details>
+      <details><summary>Port 8080 is already used</summary><p>Start with another port: <code>sh server/start.sh --port 9090</code>, then open <code>http://localhost:9090</code>.</p></details>
+    </section>
+
+    <p class="fine">For personal listening. ProjectMusic is not affiliated with YouTube, Google or Audius; personal server mode uses YouTube unofficially and is your own responsibility. <a href="https://github.com/MahendraDharma/ProjectMusic" target="_blank" rel="noopener">Source code on GitHub</a> · MIT License.</p>
+  </main>
+
+  <!-- ===================================================== BAHASA INDONESIA -->
+  <main lang="id" data-lang-block="id" hidden>
+    <section class="hero">
+      <h1>Musikmu, di server milikmu sendiri.</h1>
+      <p class="lead">ProjectMusic gratis dan open source. Unduh, nyalakan server kecilnya di komputer atau HP Android, dan halaman ini langsung jadi aplikasi musik lengkap: katalog YouTube Music, lirik tersinkron, kartu share, dan lainnya.</p>
+      <div class="status" data-status>
+        <span class="dot"></span>
+        <span class="status-text" data-status-text>Mengecek server…</span>
+        <a class="btn primary" data-open hidden href="../">Buka ProjectMusic</a>
+      </div>
+      <div class="cta">
+        <a class="btn primary big" data-download href="../download/ProjectMusic.zip" download>Unduh ProjectMusic (.zip)</a>
+        <a class="btn" href="https://github.com/MahendraDharma/ProjectMusic/archive/refs/heads/main.zip">Unduhan alternatif (GitHub)</a>
+      </div>
+      <p class="meta" data-meta>Windows · Mac · Linux · Android (Termux) — sekitar 1 MB</p>
+    </section>
+
+    <section>
+      <h2>Cara memasang — pilih perangkatmu</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-os="windows">Windows</button>
+        <button role="tab" data-os="mac">Mac</button>
+        <button role="tab" data-os="linux">Linux</button>
+        <button role="tab" data-os="android">Android</button>
+        <button role="tab" data-os="iphone">iPhone / iPad</button>
+      </div>
+
+      <div class="os" data-os-panel="windows">
+        <ol class="steps">
+          <li><b>Pasang Python.</b> Unduh dari <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a>. Saat memasang, <b>centang “Add python.exe to PATH”</b>, lalu klik Install Now.</li>
+          <li><b>Unduh dan ekstrak ProjectMusic</b> lewat tombol di atas. Klik kanan file zip → <b>Extract All</b>.</li>
+          <li><b>Nyalakan server.</b> Buka folder <code>ProjectMusic\server</code>, lalu klik dua kali <code>start.bat</code>. Pertama kali butuh sekitar 1 menit. Biarkan jendelanya tetap terbuka.</li>
+          <li><b>Buka aplikasinya.</b> Kembali ke halaman ini (statusnya jadi hijau), tekan <b>Buka ProjectMusic</b>, atau buka <code>http://localhost:8080</code>.</li>
+        </ol>
+        <p class="note">Windows mungkin menampilkan “Windows protected your PC”: klik <b>More info → Run anyway</b>. Skrip ini hanya menyiapkan Python dan menyalakan server.</p>
+      </div>
+
+      <div class="os" data-os-panel="mac">
+        <ol class="steps">
+          <li><b>Pasang Python.</b> Unduh installer macOS dari <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a> lalu jalankan. Di akhir, klik dua kali <b>Install Certificates.command</b> di folder Python yang terbuka.</li>
+          <li><b>Unduh ProjectMusic</b> lewat tombol di atas, lalu klik dua kali file zip di Downloads untuk mengekstraknya.</li>
+          <li><b>Nyalakan server.</b> Buka <b>Terminal</b> (⌘ Spasi, ketik Terminal), lalu jalankan:
+            <pre><code>cd ~/Downloads/ProjectMusic && sh server/start.sh</code></pre>
+            Pertama kali butuh sekitar 1 menit. Biarkan jendela Terminal tetap terbuka.</li>
+          <li><b>Buka aplikasinya.</b> Kembali ke halaman ini dan tekan <b>Buka ProjectMusic</b>, atau buka <code>http://localhost:8080</code>.</li>
+        </ol>
+        <p class="note">Lain kali cukup langkah 3. Matikan server dengan <kbd>Control</kbd> + <kbd>C</kbd> di Terminal.</p>
+      </div>
+
+      <div class="os" data-os-panel="linux">
+        <ol class="steps">
+          <li><b>Pastikan Python 3.10+ terpasang.</b> Di Ubuntu/Debian:
+            <pre><code>sudo apt install python3 python3-venv python3-pip</code></pre>
+            (Fedora: <code>sudo dnf install python3 python3-pip</code> · Arch: <code>sudo pacman -S python python-pip</code>)</li>
+          <li><b>Unduh dan ekstrak ProjectMusic</b> lewat tombol di atas, atau clone:
+            <pre><code>git clone https://github.com/MahendraDharma/ProjectMusic</code></pre></li>
+          <li><b>Pasang ke menu aplikasi</b> (tanpa sudo). Tambahkan <code>--autostart</code> agar server menyala setiap login:
+            <pre><code>sh ProjectMusic/server/install-linux.sh --autostart</code></pre></li>
+          <li><b>Buka ProjectMusic</b> dari menu aplikasi. Server menyala di latar belakang dan aplikasi terbuka di browser.</li>
+        </ol>
+        <p class="note">Hapus lagi dengan <code>sh ProjectMusic/server/install-linux.sh --uninstall</code>.</p>
+      </div>
+
+      <div class="os" data-os-panel="android">
+        <ol class="steps">
+          <li><b>Pasang Termux</b> dari <a href="https://f-droid.org/packages/com.termux/" target="_blank" rel="noopener">F-Droid</a> (versi Play Store sudah usang).</li>
+          <li><b>Di Termux, jalankan satu per satu:</b>
+            <pre><code>pkg install -y python git</code></pre>
+            <pre><code>git clone https://github.com/MahendraDharma/ProjectMusic</code></pre>
+            <pre><code>sh ProjectMusic/server/start.sh</code></pre></li>
+          <li><b>Buka aplikasinya</b> di Chrome pada HP yang sama: kembali ke halaman ini dan tekan <b>Buka ProjectMusic</b>, atau buka <code>http://localhost:8080</code>.</li>
+          <li><b>Agar tetap jalan saat layar mati:</b> tarik notifikasi Termux → <b>Acquire wakelock</b>.</li>
+        </ol>
+        <p class="note">HP Android lama yang dicas terus bisa jadi server musik untuk seisi rumah.</p>
+      </div>
+
+      <div class="os" data-os-panel="iphone">
+        <p>iPhone dan iPad tidak bisa menjalankan server sendiri, tapi bisa memakai server di komputer atau HP Android.</p>
+        <ol class="steps">
+          <li><b>Nyalakan server</b> di komputer atau HP Android (lihat tab lainnya).</li>
+          <li><b>Wi-Fi yang sama:</b> jendela server menampilkan alamat seperti <code>http://192.168.1.5:8080</code>. Buka di Safari.</li>
+          <li><b>Di luar rumah:</b> pasang <a href="https://tailscale.com/download" target="_blank" rel="noopener">Tailscale</a> di kedua perangkat dan login dengan akun yang sama, lalu buka <code>http://&lt;nama-komputer&gt;:8080</code>.</li>
+          <li><b>Jadikan aplikasi:</b> Share → <b>Add to Home Screen</b>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>Pemakaian sehari-hari</h2>
+      <div class="grid">
+        <div class="card"><h3>Buka dari situs ini</h3><p>Selama server menyala, <a href="../">situs ProjectMusic</a> otomatis tersambung ke server di perangkat yang sama. Pakai Chrome, Edge, atau Firefox, dan pilih <b>Izinkan</b> bila ditanya soal jaringan lokal. Di Safari, buka <code>http://localhost:8080</code>.</p></div>
+        <div class="card"><h3>Pasang seperti aplikasi</h3><p>Chrome/Edge di komputer: ikon <b>Install</b> di bilah alamat. Chrome Android: ⋮ → <b>Tambahkan ke layar utama</b>. Safari iPhone: Share → <b>Add to Home Screen</b>.</p></div>
+        <div class="card"><h3>Tanpa server</h3><p>Situs ini tetap jalan dengan musik indie dari Audius, file lokal, dan lagu favoritmu — tanpa perlu pemasangan.</p></div>
+        <div class="card"><h3>Memperbarui</h3><p>Unduh lagi file zip (atau <code>git pull</code>). Skrip start juga otomatis memperbarui alat pengambil lagu setiap dijalankan.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Kalau ada masalah</h2>
+      <details><summary>Daftar lagu muncul tapi tidak bisa diputar</summary><p>Matikan server lalu nyalakan lagi: skrip start memperbarui <code>yt-dlp</code>, yang biasanya memperbaikinya. Pastikan memakai Wi-Fi rumah atau data seluler, bukan VPN.</p></details>
+      <details><summary>Muncul “Sign in to confirm you’re not a bot”</summary><p>YouTube memblokir server di pusat data dan sebagian VPN. Jalankan server di koneksi rumah biasa.</p></details>
+      <details><summary>Halaman ini bilang server mati, padahal menyala</summary><p>Safari memblokir situs aman yang menghubungi <code>localhost</code>: buka <code>http://localhost:8080</code> langsung, atau pakai Chrome/Edge/Firefox dan izinkan akses jaringan lokal. Kalau port diganti, atur alamatnya di aplikasi: Settings → Server address.</p></details>
+      <details><summary>Port 8080 sudah dipakai</summary><p>Nyalakan dengan port lain: <code>sh server/start.sh --port 9090</code>, lalu buka <code>http://localhost:9090</code>.</p></details>
+    </section>
+
+    <p class="fine">Untuk pemakaian pribadi. ProjectMusic tidak berafiliasi dengan YouTube, Google, maupun Audius; mode server pribadi memakai YouTube secara tidak resmi dan menjadi tanggung jawab masing-masing pengguna. <a href="https://github.com/MahendraDharma/ProjectMusic" target="_blank" rel="noopener">Kode sumber di GitHub</a> · Lisensi MIT.</p>
+  </main>
+
+  <script src="get.js"></script>
+</body>
+</html>

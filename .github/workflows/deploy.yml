@@ -1,4 +1,5 @@
-# Deploy folder public/ ke GitHub Pages setiap ada push ke branch main.
+# Deploy folder public/ ke GitHub Pages setiap ada push ke branch main,
+# termasuk paket download ProjectMusic.zip untuk halaman "Get ProjectMusic".
 # Aktifkan sekali: Settings → Pages → Source: "GitHub Actions".
 name: Deploy ke GitHub Pages
 
@@ -24,6 +25,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # Downloadable package for the "Get ProjectMusic" page: everything needed to run
+      # the personal server (design files are excluded via .gitattributes).
+      - name: Build download package
+        run: |
+          mkdir -p public/download
+          git archive --format=zip --prefix=ProjectMusic/ -o public/download/ProjectMusic.zip HEAD
+          echo "{\"version\": \"$(date -u +%Y.%m.%d)\", \"commit\": \"${GITHUB_SHA::7}\", \"bytes\": $(stat -c %s public/download/ProjectMusic.zip)}" > public/download/latest.json
+          cat public/download/latest.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

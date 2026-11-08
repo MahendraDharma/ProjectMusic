@@ -52,7 +52,7 @@ const EN = {
   browsePop: 'Pop Indonesia', browseDangdut: 'Dangdut & Koplo', browseGalau: 'Heartbreak', browseChill: 'Chill',
   browseIndie: 'Indie', browseAudius: 'Indie on Audius', dropFiles: 'Drop music files to play them',
   unknownArtist: 'Unknown artist', localFile: 'Local file', openInYtm: 'Open in YouTube Music', openInAudius: 'Open on Audius',
-  languageSet: 'Language: English',
+  languageSet: 'Language: English', setupGuide: 'Download & setup guide',
 };
 
 const ID = {
@@ -105,7 +105,7 @@ const ID = {
   browsePop: 'Pop Indonesia', browseDangdut: 'Dangdut & Koplo', browseGalau: 'Galau', browseChill: 'Santai',
   browseIndie: 'Indie', browseAudius: 'Indie di Audius', dropFiles: 'Lepaskan file musik untuk memutarnya',
   unknownArtist: 'Artis tidak diketahui', localFile: 'File lokal', openInYtm: 'Buka di YouTube Music', openInAudius: 'Buka di Audius',
-  languageSet: 'Bahasa: Indonesia',
+  languageSet: 'Bahasa: Indonesia', setupGuide: 'Unduh & panduan',
 };
 
 const DICTS = { en: EN, id: ID };
