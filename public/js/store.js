@@ -126,6 +126,13 @@ export const playlists = {
     saveLists();
     return added;
   },
+  /** Fill in a song's length everywhere it was saved without one. */
+  setDuration(trackId, duration) {
+    let changed = false;
+    const fix = (t) => (t.id === trackId && !t.duration ? ((changed = true), { ...t, duration }) : t);
+    lists = lists.map((p) => ({ ...p, tracks: p.tracks.map(fix) }));
+    if (changed) saveLists();
+  },
   removeAt(id, index) {
     lists = lists.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((_, i) => i !== index) } : p));
     saveLists();

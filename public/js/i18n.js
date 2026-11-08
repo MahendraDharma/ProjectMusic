@@ -72,7 +72,7 @@ const EN = {
   alreadyIn: 'Already in {name}', removeFromPlaylist: 'Remove from this playlist', rename: 'Rename', deletePlaylist: 'Delete playlist',
   deleted: 'Playlist deleted', confirmDelete: 'Delete “{name}”? This can’t be undone.', emptyPlaylist: 'This playlist is empty',
   emptyPlaylistHint: 'Add songs from the ⋯ menu on any song.', fromSource: 'From {s}', yourPlaylist: 'Your playlist', create: 'Create',
-  noTracksInText: 'No songs found in that text. Use one “Artist - Title” per line.', save: 'Save', removed: 'Removed',
+  updated: 'ProjectMusic updated to {v}', noTracksInText: 'No songs found in that text. Use one “Artist - Title” per line.', save: 'Save', removed: 'Removed',
 };
 
 const ID = {
@@ -145,7 +145,7 @@ const ID = {
   alreadyIn: 'Sudah ada di {name}', removeFromPlaylist: 'Hapus dari playlist ini', rename: 'Ganti nama', deletePlaylist: 'Hapus playlist',
   deleted: 'Playlist dihapus', confirmDelete: 'Hapus “{name}”? Tidak bisa dibatalkan.', emptyPlaylist: 'Playlist ini masih kosong',
   emptyPlaylistHint: 'Tambahkan lagu dari menu ⋯ di lagu mana pun.', fromSource: 'Dari {s}', yourPlaylist: 'Playlist kamu', create: 'Buat',
-  noTracksInText: 'Tidak ada lagu di teks itu. Tulis satu “Artis - Judul” per baris.', save: 'Simpan', removed: 'Dihapus',
+  updated: 'ProjectMusic diperbarui ke {v}', noTracksInText: 'Tidak ada lagu di teks itu. Tulis satu “Artis - Judul” per baris.', save: 'Simpan', removed: 'Dihapus',
 };
 
 const DICTS = { en: EN, id: ID };

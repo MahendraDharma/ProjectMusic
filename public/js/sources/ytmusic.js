@@ -84,6 +84,8 @@ export function lyrics(track, signal) {
 
 export const streamUrl = (track) => `${base}api/stream?id=${encodeURIComponent(track.videoId)}`;
 export const downloadUrl = (track) => streamUrl(track) + '&download=1';
+/** Real length of a song in seconds (0 if unknown). */
+export const meta = (track) => api('meta', { id: track.videoId }).then((d) => d.duration || 0).catch(() => 0);
 /** Ask the server to look up a song's audio link ahead of time (fire and forget). */
 const prepared = new Map(); // videoId -> time asked, so each song is asked for once
 export function prepare(track) {
