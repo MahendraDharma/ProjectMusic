@@ -60,6 +60,19 @@ const EN = {
   welcomeTitle: 'Welcome to ProjectMusic', welcomeText: 'A free, light music player. No account, no ads.',
   welcome1: 'Synced lyrics and smooth transitions between songs', welcome2: 'Share songs and lyrics to your Instagram Story',
   welcome3: 'Mix two songs, and recommendations made on your device', startListening: 'Start listening', setupServer: 'Set up YouTube Music',
+  playlist: 'Playlist', playlists: 'Playlists', importPlaylist: 'Import playlist', importHint: 'Bring a playlist from another app: paste its link, or a list of songs.',
+  importWorksWith: 'Works with', pasteLink: 'Playlist link', linkPlaceholder: 'https://open.spotify.com/playlist/…', importBtn: 'Import',
+  reading: 'Reading the playlist…', orPasteList: 'Or paste a list of songs', textList: 'Song list',
+  pasteListHint: 'One song per line, like “Artist - Title”. CSV files from Exportify or TuneMyMusic work too.',
+  openFile: 'Open a file', findSongs: 'Find songs', matching: 'Finding songs on YouTube Music… {done} of {total}',
+  matchedOf: '{found} of {total} songs found', notFoundTitle: 'Not found ({n})', notFoundHint: 'Tap one to search for it yourself.',
+  savePlaylist: 'Save to Library', saved: 'Playlist saved', playlistName: 'Playlist name', stop: 'Stop',
+  importNeedServer: 'Importing needs your personal server: it finds every song on YouTube Music.',
+  importAnother: 'Import another', newPlaylist: 'New playlist', addToPlaylist: 'Add to playlist', addedTo: 'Added to {name}',
+  alreadyIn: 'Already in {name}', removeFromPlaylist: 'Remove from this playlist', rename: 'Rename', deletePlaylist: 'Delete playlist',
+  deleted: 'Playlist deleted', confirmDelete: 'Delete “{name}”? This can’t be undone.', emptyPlaylist: 'This playlist is empty',
+  emptyPlaylistHint: 'Add songs from the ⋯ menu on any song.', fromSource: 'From {s}', yourPlaylist: 'Your playlist', create: 'Create',
+  noTracksInText: 'No songs found in that text. Use one “Artist - Title” per line.', save: 'Save', removed: 'Removed',
 };
 
 const ID = {
@@ -120,6 +133,19 @@ const ID = {
   welcomeTitle: 'Selamat datang di ProjectMusic', welcomeText: 'Pemutar musik gratis dan ringan. Tanpa akun, tanpa iklan.',
   welcome1: 'Lirik tersinkron dan transisi halus antar lagu', welcome2: 'Bagikan lagu dan lirik ke Instagram Story',
   welcome3: 'Mix dua lagu, dan rekomendasi yang dibuat di perangkatmu', startListening: 'Mulai mendengarkan', setupServer: 'Pasang YouTube Music',
+  playlist: 'Playlist', playlists: 'Playlist', importPlaylist: 'Impor playlist', importHint: 'Bawa playlist dari aplikasi lain: tempel tautannya, atau daftar lagunya.',
+  importWorksWith: 'Bisa dari', pasteLink: 'Tautan playlist', importBtn: 'Impor',
+  reading: 'Membaca playlist…', orPasteList: 'Atau tempel daftar lagu', textList: 'Daftar lagu',
+  pasteListHint: 'Satu lagu per baris, misalnya “Artis - Judul”. File CSV dari Exportify atau TuneMyMusic juga bisa.',
+  openFile: 'Buka file', findSongs: 'Cari lagunya', matching: 'Mencari lagu di YouTube Music… {done} dari {total}',
+  matchedOf: '{found} dari {total} lagu ditemukan', notFoundTitle: 'Tidak ditemukan ({n})', notFoundHint: 'Ketuk untuk mencarinya sendiri.',
+  savePlaylist: 'Simpan ke Koleksi', saved: 'Playlist disimpan', playlistName: 'Nama playlist', stop: 'Berhenti',
+  importNeedServer: 'Impor butuh server pribadi: server itulah yang mencari setiap lagu di YouTube Music.',
+  importAnother: 'Impor lagi', newPlaylist: 'Playlist baru', addToPlaylist: 'Tambah ke playlist', addedTo: 'Ditambahkan ke {name}',
+  alreadyIn: 'Sudah ada di {name}', removeFromPlaylist: 'Hapus dari playlist ini', rename: 'Ganti nama', deletePlaylist: 'Hapus playlist',
+  deleted: 'Playlist dihapus', confirmDelete: 'Hapus “{name}”? Tidak bisa dibatalkan.', emptyPlaylist: 'Playlist ini masih kosong',
+  emptyPlaylistHint: 'Tambahkan lagu dari menu ⋯ di lagu mana pun.', fromSource: 'Dari {s}', yourPlaylist: 'Playlist kamu', create: 'Buat',
+  noTracksInText: 'Tidak ada lagu di teks itu. Tulis satu “Artis - Judul” per baris.', save: 'Simpan', removed: 'Dihapus',
 };
 
 const DICTS = { en: EN, id: ID };

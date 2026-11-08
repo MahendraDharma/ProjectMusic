@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi (HTML/CSS/JS) agar terbuka cepat & bisa
 // di-install. Request ke API/audio (domain lain) tidak disentuh — selalu langsung ke jaringan.
-const VERSION = 'pm-v11';
+const VERSION = 'pm-v12';
 const SHELL = [
   './',
   'index.html',
@@ -17,6 +17,7 @@ const SHELL = [
   'js/taste.js',
   'js/share.js',
   'js/mix.js',
+  'js/importer.js',
   'js/sources/audius.js',
   'js/sources/local.js',
   'js/sources/ytmusic.js',

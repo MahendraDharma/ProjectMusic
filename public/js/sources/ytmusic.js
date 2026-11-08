@@ -64,6 +64,15 @@ export const artist = (id, signal) => api('artist', { id }, signal);
 export const playlist = (id, signal) => api('playlist', { id }, signal);
 export const next = (videoId, signal) => api('next', { id: videoId }, signal).then((d) => d.tracks || []);
 
+/** Read a playlist link from YouTube Music, Spotify, Apple Music or Deezer. */
+export const importList = (url, signal) => api('import', { url }, signal);
+/** Find the same song on YouTube Music. Resolves to a track or null. */
+export const match = (song, signal) => api('match', {
+  title: song.title,
+  artist: song.artist || '',
+  duration: Math.round(song.duration || 0),
+}, signal).then((d) => d.track || null);
+
 export function lyrics(track, signal) {
   return api('lyrics', {
     id: track.videoId || '',

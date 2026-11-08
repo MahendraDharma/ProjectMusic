@@ -43,6 +43,10 @@ guide is available in [Indonesian](docs/PANDUAN-SERVER.md).*
   orders the autoplay radio and builds *Made for you*. Nothing is uploaded.
 - **Synced lyrics** — full-screen on phones, side by side on desktop; tap a line to jump (from LRCLIB / YouTube Music)
 - **Share to Instagram** — pick up to 5 lyric lines or the whole song, get a 9:16 Story card, send it via the share sheet
+- **Import playlists** — paste a public playlist or album link from YouTube Music, Spotify, Apple Music or Deezer,
+  or a song list / CSV (Exportify, TuneMyMusic) / M3U; every song is found on YouTube Music and saved to your Library.
+  Only titles and artists are read from those apps
+- **Your playlists** — create, rename and delete playlists, and add any song from its ⋯ menu (stored on your device)
 - **Mix** — blend two songs with a crossfader, per-deck volume, bass and treble
 - Queue, shuffle, repeat, sleep timer, liked songs, history, downloads
 - **Local files** — pick or drag & drop MP3s; they never leave the device
@@ -88,6 +92,7 @@ public/
 │   ├── taste.js            # on-device taste model (artist scores, skips, ranking)
 │   ├── share.js            # Instagram Story cards drawn on <canvas>
 │   ├── mix.js              # two-deck mixer (Web Audio API, loaded on demand)
+│   ├── importer.js         # playlist import: links, song lists, CSV, M3U (loaded on demand)
 │   ├── i18n.js             # English (default) and Bahasa Indonesia
 │   ├── store.js            # liked songs, history, settings (localStorage)
 │   ├── ui.js               # DOM helper, icons, sheet, toast, skeletons

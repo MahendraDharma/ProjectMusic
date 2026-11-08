@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -406,6 +406,323 @@ def api_prepare(q):
     return {"ok": True}
 
 
+# --------------------------------------------------------------------------- #
+# Import playlist dari platform lain. Hanya daftar lagu (judul, artis, durasi) dari
+# halaman publik yang dibaca; audio tetap diputar dari YouTube Music lewat pencocokan.
+# --------------------------------------------------------------------------- #
+IMPORT_HOSTS = {
+    "open.spotify.com", "spotify.link", "spotify.app.link",
+    "music.apple.com", "itunes.apple.com", "embed.music.apple.com",
+    "www.deezer.com", "deezer.com", "link.deezer.com", "deezer.page.link", "dzr.page.link",
+    "music.youtube.com", "www.youtube.com", "youtube.com", "m.youtube.com", "youtu.be",
+}
+BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+)
+IMPORT_MAX = 1000
+
+
+def _host_ok(url: str) -> bool:
+    p = urllib.parse.urlparse(url)
+    return p.scheme in ("http", "https") and (p.hostname or "").lower() in IMPORT_HOSTS
+
+
+def _fetch(url: str, *, data_host: str | None = None) -> tuple[str, str]:
+    """Ambil halaman publik. Pengalihan (tautan pendek) hanya boleh ke host yang dikenal."""
+    if not (_host_ok(url) or (data_host and urllib.parse.urlparse(url).hostname == data_host)):
+        raise ValueError("This link is not supported.")
+    req = urllib.request.Request(url, headers={"User-Agent": BROWSER_UA, "Accept-Language": "en-US,en;q=0.8"})
+    try:
+        with urlopen(req, timeout=15) as r:
+            final = r.geturl()
+            if not (_host_ok(final) or (data_host and urllib.parse.urlparse(final).hostname == data_host)):
+                raise ValueError("This link is not supported.")
+            return final, r.read(8_000_000).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403, 404):
+            raise ValueError("Playlist not found. Make sure it is public.") from None
+        raise
+
+
+def _ms(v) -> int:
+    try:
+        return int(round(float(v) / 1000))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _https(url) -> str:
+    return url if isinstance(url, str) and url.startswith("https://") else ""
+
+
+def _import_youtube(url: str) -> dict:
+    p = urllib.parse.urlparse(url)
+    qs = urllib.parse.parse_qs(p.query)
+    pid = (qs.get("list") or [""])[0]
+    if p.path.startswith("/browse/MPRE"):
+        album = ytm().get_album(p.path.split("/")[2])
+        items = album.get("tracks") or []
+        for it in items:  # lagu album tidak membawa sampul sendiri
+            it.setdefault("thumbnails", album.get("thumbnails"))
+        return {"name": album.get("title") or "Album", "cover": _art(album.get("thumbnails"), 544),
+                "tracks": tracks(items), "matched": True}
+    if not pid:
+        raise ValueError("This YouTube link has no playlist in it (look for “list=” in the link).")
+    if pid in ("LM", "LL", "WL"):
+        raise ValueError("Private lists like Liked Music can’t be read. Make a public copy first.")
+    try:
+        pl = ytm().get_playlist(pid, limit=IMPORT_MAX)
+    except Exception:
+        raise ValueError("Playlist not found. Make sure it is public or unlisted.") from None
+    found = tracks(pl.get("tracks"))
+    return {"name": pl.get("title") or "YouTube playlist", "cover": _art(pl.get("thumbnails"), 544),
+            "tracks": found, "matched": True}
+
+
+def _import_spotify(url: str) -> dict:
+    if (urllib.parse.urlparse(url).hostname or "").endswith(".link"):
+        url, _ = _fetch(url)  # tautan pendek -> open.spotify.com/...
+    parts = [s for s in urllib.parse.urlparse(url).path.split("/") if s and not s.startswith("intl-")]
+    kinds = ("playlist", "album", "track", "artist")
+    if len(parts) < 2 or parts[0] not in kinds:
+        raise ValueError("Use a Spotify playlist, album or song link.")
+    kind, sid = parts[0], parts[1]
+    if not re.match(r"^[A-Za-z0-9]{10,32}$", sid):
+        raise ValueError("This Spotify link looks incomplete.")
+    _, html = _fetch(f"https://open.spotify.com/embed/{kind}/{sid}")
+    m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.S)
+    if not m:
+        raise ValueError("Spotify didn’t return this playlist. Make sure it is public.")
+    ent = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("state") or {}).get("data", {}).get("entity") or {}
+    cover = ""
+    for src in ((ent.get("coverArt") or {}).get("sources") or ent.get("visualIdentity", {}).get("image") or []):
+        if isinstance(src, dict) and src.get("url"):
+            cover = _https(src["url"])
+            break
+    items = ent.get("trackList") or []
+    if kind == "track" and not items:
+        items = [{"title": ent.get("title") or ent.get("name"), "subtitle": ", ".join(a.get("name", "") for a in ent.get("artists") or []),
+                  "duration": ent.get("duration")}]
+    out = []
+    for it in items[:IMPORT_MAX]:
+        title = (it.get("title") or "").strip()
+        if title:
+            out.append({"title": title, "artist": re.sub(r"\s*,\s*", ", ", (it.get("subtitle") or "").replace(" ", " ")).strip(),
+                        "duration": _ms(it.get("duration"))})
+    return {"name": ent.get("name") or ent.get("title") or "Spotify", "cover": cover, "tracks": out}
+
+
+def _import_apple(url: str) -> dict:
+    p = urllib.parse.urlparse(url)
+    if not re.search(r"/(playlist|album|song)/", p.path):
+        raise ValueError("Use an Apple Music playlist or album link.")
+    _, html = _fetch(urllib.parse.urlunparse(p._replace(netloc="music.apple.com", fragment="")))
+    name, cover, out = "", "", []
+    m = re.search(r'<script[^>]*id="serialized-server-data"[^>]*>(.*?)</script>', html, re.S)
+    if m:
+        try:
+            data = json.loads(m.group(1))
+            page = data["data"][0]["data"] if isinstance(data, dict) else data[0]["data"]
+            album_artist = ""
+            for sec in page.get("sections") or []:
+                kind = sec.get("itemKind") or ""
+                for it in sec.get("items") or []:
+                    if kind == "containerDetailHeaderLockup":
+                        name = name or it.get("title") or ""
+                        album_artist = ", ".join(x.get("title", "") for x in it.get("subtitleLinks") or []) or album_artist
+                        art = (it.get("artwork") or {}).get("dictionary") or {}
+                        if art.get("url"):
+                            cover = _https(art["url"].replace("{w}", "544").replace("{h}", "544").replace("{f}", "jpg"))
+                    elif kind == "trackLockup" and it.get("title"):
+                        artist = it.get("artistName") or ", ".join(x.get("title", "") for x in it.get("subtitleLinks") or [])
+                        out.append({"title": it["title"], "artist": artist or album_artist, "duration": _ms(it.get("duration"))})
+        except (KeyError, IndexError, TypeError, ValueError):
+            out = []
+    if not out:  # cadangan: data schema.org di halaman
+        for blob in re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.S):
+            try:
+                j = json.loads(blob)
+            except ValueError:
+                continue
+            name = name or j.get("name") or ""
+            by = j.get("byArtist") or {}
+            fallback_artist = by.get("name", "") if isinstance(by, dict) else ", ".join(a.get("name", "") for a in by)
+            for tr in j.get("track") or []:
+                d = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", tr.get("duration") or "")
+                secs = (int(d.group(1) or 0) * 3600 + int(d.group(2) or 0) * 60 + int(d.group(3) or 0)) if d else 0
+                out.append({"title": tr.get("name") or "", "artist": fallback_artist, "duration": secs})
+    out = [t for t in out if t["title"]][:IMPORT_MAX]
+    if not out:
+        raise ValueError("Apple Music didn’t return any songs. Make sure the playlist is public.")
+    return {"name": name or "Apple Music", "cover": cover, "tracks": out}
+
+
+def _import_deezer(url: str) -> dict:
+    host = urllib.parse.urlparse(url).hostname or ""
+    if host != "www.deezer.com" and host != "deezer.com":
+        url, _ = _fetch(url)  # tautan pendek
+    m = re.search(r"/(playlist|album|track)/(\d+)", urllib.parse.urlparse(url).path)
+    if not m:
+        raise ValueError("Use a Deezer playlist or album link.")
+    kind, did = m.groups()
+    api = "api.deezer.com"
+    _, raw = _fetch(f"https://{api}/{kind}/{did}", data_host=api)
+    info = json.loads(raw)
+    if info.get("error"):
+        raise ValueError("Playlist not found. Make sure it is public.")
+    if kind == "track":
+        rows = [info]
+    else:
+        rows, nxt = [], f"https://{api}/{kind}/{did}/tracks?limit=100"
+        while nxt and len(rows) < IMPORT_MAX:
+            _, raw = _fetch(nxt, data_host=api)
+            page = json.loads(raw)
+            rows += page.get("data") or []
+            nxt = page.get("next")
+    out = [{"title": r.get("title") or "", "artist": (r.get("artist") or {}).get("name", ""), "duration": int(r.get("duration") or 0)}
+           for r in rows if r.get("title")]
+    return {"name": info.get("title") or "Deezer", "cover": _https(info.get("picture_big") or info.get("cover_big") or ""),
+            "tracks": out[:IMPORT_MAX]}
+
+
+def api_import(q):
+    url = (q.get("url") or [""])[0].strip()
+    if not url:
+        raise ValueError("Paste a playlist link first.")
+    if not re.match(r"^https?://", url, re.I):
+        url = "https://" + url
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    if host not in IMPORT_HOSTS:
+        raise ValueError("This link isn’t supported yet. Try YouTube Music, Spotify, Apple Music or Deezer.")
+    if "spotify" in host:
+        source, fn = "spotify", _import_spotify
+    elif "apple.com" in host:
+        source, fn = "apple", _import_apple
+    elif "deezer" in host or host.endswith(".page.link"):
+        source, fn = "deezer", _import_deezer
+    else:
+        source, fn = "youtube", _import_youtube
+    result = cached("import:" + url, 10 * 60, lambda: fn(url))
+    if not result["tracks"]:
+        raise ValueError("This playlist looks empty.")
+    return {"source": source, "matched": False, **result}
+
+
+# ---- pencocokan lagu ke YouTube Music ---------------------------------------- #
+_EXTRA = re.compile(
+    r"\s*([\(\[][^)\]]*[\)\]]|\s-\s.*(remaster|version|edit|mix|live|mono|stereo|from|feat|bonus|deluxe|acoustic).*$)", re.I
+)
+
+
+def _norm(s: str) -> str:
+    import unicodedata
+
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode() or (s or "")
+    s = re.sub(r"\b(feat|ft|featuring)\.?\b.*$", "", s.lower())
+    s = re.sub(r"[^\w\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _artists(s: str) -> list[str]:
+    return [a for a in (_norm(x) for x in re.split(r",|&| x | and |;|/|\bfeat\.?|\bft\.?", s or "", flags=re.I)) if a]
+
+
+def _sim(a: str, b: str) -> float:
+    from difflib import SequenceMatcher
+
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    ratio = SequenceMatcher(None, a, b).ratio()
+    if (a in b or b in a) and min(len(a), len(b)) >= 3:
+        # "judul" di dalam "judul (versi panjang)" mirip, tapi makin panjang sisanya makin ragu
+        return max(ratio, 0.6 + 0.35 * min(len(a), len(b)) / max(len(a), len(b)))
+    return ratio
+
+
+_VERSION_WORDS = re.compile(
+    r"\b(remix|live|acoustic|sped ?up|slowed|reverb|nightcore|instrumental|karaoke|cover|8d|lounge|session|"
+    r"demo|extended|radio edit|mashup|piano|lofi|lo-fi|bass ?boosted)\b", re.I
+)
+
+
+_NUMERAL = re.compile(r"^(\d+|ii|iii|iv|vi|vii|viii|ix)$")
+
+
+def _numbers(s: str) -> set:
+    return {w for w in s.split() if _NUMERAL.match(w)}
+
+
+def _match_score(title: str, artist: str, duration: int, cand: dict) -> float:
+    want = _norm(_EXTRA.sub("", title)) or _norm(title)
+    raw_title = cand.get("rawTitle") or cand.get("title") or ""
+    names = [_norm(_EXTRA.sub("", raw_title)), _norm(_EXTRA.sub("", cand.get("title") or "")), _norm(cand.get("title") or "")]
+    wa, ca = _artists(artist), _artists(cand.get("artist") or "")
+    raw = _norm(raw_title)
+    for w in wa:  # unggahan "Artis - Judul": buang nama artis dari judulnya
+        if w and w in names[0]:
+            names.append(re.sub(r"\s+", " ", names[0].replace(w, " ")).strip())
+    t_score = max(_sim(want, n) for n in names)
+    if not wa:
+        a_score = 0.6
+    else:
+        a_score = max((_sim(w, c) for w in wa for c in ca), default=0.0)
+        if any(w and w in raw for w in wa):  # unggahan orang lain: "Artis - Judul (Lyrics)"
+            a_score = max(a_score, 0.7)
+    d_score, penalty = 0.85, 0.0  # durasi tidak diketahui: netral
+    if duration and cand.get("duration"):
+        diff = abs(duration - cand["duration"])
+        d_score = 1.0 if diff <= 3 else max(0.0, 1 - (diff - 3) / 40)
+        if diff > 30:
+            penalty += 0.2  # hampir pasti versi lain (potongan, live, extended)
+    # Versi lain (remix, live, sped up, ...) yang tidak diminta.
+    asked = {w.lower() for w in _VERSION_WORDS.findall(title)}
+    got = {w.lower() for w in _VERSION_WORDS.findall(raw_title)}
+    if got - asked:
+        penalty += 0.15
+    # "Storm II" bukan "Storm I", "Part 2" bukan "Part 3"
+    best_name = max(names, key=lambda n: _sim(want, n))
+    if _numbers(want) != _numbers(best_name):
+        penalty += 0.2
+    if t_score < 0.6:
+        return 0.0  # judul berbeda: jangan cocokkan hanya karena artisnya sama
+    return 0.5 * t_score + 0.35 * a_score + 0.15 * d_score - penalty
+
+
+def api_match(q):
+    title = (q.get("title") or [""])[0].strip()
+    artist = (q.get("artist") or [""])[0].strip()
+    try:
+        duration = int(float((q.get("duration") or ["0"])[0] or 0))
+    except ValueError:
+        duration = 0
+    if not title:
+        raise ValueError("title is required")
+
+    def load():
+        query = f"{_EXTRA.sub('', title) or title} {artist.split(',')[0].strip()}".strip()
+        best, best_score = None, 0.0
+        # Hasil teratas (tanpa filter) paling sering memuat lagu resmi; filter "songs"
+        # kadang kosong tanpa login, jadi video dipakai sebagai cadangan terakhir.
+        for f in (None, "songs", "videos"):
+            try:
+                found = tracks(ytm().search(query, filter=f, limit=8))[:8]
+            except Exception:
+                found = []
+            for cand in found:
+                s = _match_score(title, artist, duration, cand)
+                if s > best_score:
+                    best, best_score = cand, s
+            if best_score >= 0.95:
+                break  # lagu resmi sudah cocok, tidak perlu cari lagi
+        ok = best is not None and best_score >= 0.72
+        return {"track": best if ok else None, "score": round(best_score, 3)}
+
+    return cached(f"match:{title.lower()}|{artist.lower()}|{duration}", 6 * 3600, load)
+
+
 def _quiet(fn, *args):
     try:
         fn(*args)
@@ -433,6 +750,8 @@ API = {
     "/api/next": api_next,
     "/api/lyrics": api_lyrics,
     "/api/prepare": api_prepare,
+    "/api/import": api_import,
+    "/api/match": api_match,
 }
 
 

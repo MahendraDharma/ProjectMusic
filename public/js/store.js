@@ -93,3 +93,41 @@ export const prefs = {
     save('settings', settings);
   },
 };
+
+/* ---------- Your playlists (made here or imported) ---------- */
+let lists = load('playlists', []);
+const saveLists = () => save('playlists', lists);
+const newId = () => 'pl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+export const playlists = {
+  all: () => lists.slice(),
+  get: (id) => lists.find((p) => p.id === id) || null,
+  create({ name, tracks = [], cover = '', source = '', sourceUrl = '' }) {
+    const pl = { id: newId(), name: (name || '').trim() || 'My playlist', cover, source, sourceUrl, created: Date.now(), tracks: tracks.filter(persistable).map(slim) };
+    lists = [pl, ...lists];
+    saveLists();
+    return pl;
+  },
+  rename(id, name) {
+    lists = lists.map((p) => (p.id === id ? { ...p, name: name.trim() || p.name } : p));
+    saveLists();
+  },
+  remove(id) {
+    lists = lists.filter((p) => p.id !== id);
+    saveLists();
+  },
+  /** Adds a song (skips it if it is already there). Returns false when it was already in. */
+  add(id, track) {
+    let added = false;
+    lists = lists.map((p) => {
+      if (p.id !== id || !persistable(track) || p.tracks.some((t) => t.id === track.id)) return p;
+      added = true;
+      return { ...p, tracks: [...p.tracks, slim(track)] };
+    });
+    saveLists();
+    return added;
+  },
+  removeAt(id, index) {
+    lists = lists.map((p) => (p.id === id ? { ...p, tracks: p.tracks.filter((_, i) => i !== index) } : p));
+    saveLists();
+  },
+};
