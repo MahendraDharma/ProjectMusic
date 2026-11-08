@@ -152,3 +152,29 @@ export function skeletonCards(n = 4) {
   return h('div', { class: 'cards', 'aria-busy': 'true' },
     Array.from({ length: n }, () => h('div', { class: 'card' }, h('span', { class: 'skel cover' }), h('span', { class: 'skel l1' }), h('span', { class: 'skel l2' }))));
 }
+
+/* ---------- Pixel cloud: the loading animation ----------
+   A cloud made of square pixels that shimmer left to right, with pink pixel "rain"
+   falling from it. Pure SVG + CSS (see .pcloud in style.css). */
+const CLOUD = [
+  '....###.....',
+  '...#####.##.',
+  '.##########.',
+  '############',
+  '############',
+  '.##########.',
+];
+export function pixelCloudMarkup() {
+  let rects = '';
+  CLOUD.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c === '#') rects += `<rect x="${x + 0.08}" y="${y + 0.08}" width=".84" height=".84" style="--i:${x + y}"/>`;
+  }));
+  const drops = [[3, 0], [6, 1], [9, 2]].map(([x, i]) => `<rect class="drop" x="${x + 0.15}" y="6.6" width=".7" height=".7" style="--i:${i}"/>`).join('');
+  return `<svg class="pcloud" viewBox="0 0 12 10" aria-hidden="true"><g class="pc-body">${rects}</g>${drops}</svg>`;
+}
+export function pixelCloud(cls = '') {
+  const wrap = document.createElement('span');
+  wrap.className = 'pcloud-wrap' + (cls ? ' ' + cls : '');
+  wrap.innerHTML = pixelCloudMarkup(); // static markup built above, no outside data
+  return wrap;
+}
