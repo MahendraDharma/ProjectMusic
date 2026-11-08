@@ -223,7 +223,18 @@ class Player extends EventTarget {
     for (const ev of ['loadstart', 'waiting', 'play', 'playing', 'canplay', 'pause', 'error', 'emptied']) {
       a.addEventListener(ev, () => a === this.audio && this._emit('loading'));
     }
-    a.addEventListener('loadedmetadata', () => a === this.audio && this._emit('time'));
+    a.addEventListener('loadedmetadata', () => {
+      if (a !== this.audio) return;
+      this._emit('time');
+      // No length in our data (e.g. some imported songs)? Ask for it, so a browser that
+      // misreads the stream (Safari) can't stretch the bar past the end of the song.
+      const tr = this.current;
+      if (tr && !tr.duration && this.lookupDuration) {
+        this.lookupDuration(tr).then((d) => {
+          if (d > 0) { tr.duration = d; this._emit('time'); this._emit('duration', { track: tr }); }
+        });
+      }
+    });
     a.addEventListener('timeupdate', () => a === this.audio && this._onTime());
     a.addEventListener('error', () => {
       if (a !== this.audio || !a.getAttribute('src')) return;

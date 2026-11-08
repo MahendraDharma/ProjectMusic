@@ -30,7 +30,9 @@ jobs:
       - name: Build download package
         run: |
           mkdir -p public/download
-          git archive --format=zip --prefix=ProjectMusic/ -o public/download/ProjectMusic.zip HEAD
+          # build.json tells an installed server which version it is, for auto-updates.
+          echo "{\"commit\": \"${GITHUB_SHA::7}\", \"version\": \"$(date -u +%Y.%m.%d)\"}" > build.json
+          git archive --format=zip --prefix=ProjectMusic/ --add-file=build.json -o public/download/ProjectMusic.zip HEAD
           echo "{\"version\": \"$(date -u +%Y.%m.%d)\", \"commit\": \"${GITHUB_SHA::7}\", \"bytes\": $(stat -c %s public/download/ProjectMusic.zip)}" > public/download/latest.json
           cat public/download/latest.json
       - uses: actions/configure-pages@v5

@@ -6,3 +6,4 @@ __pycache__/
 server/server.log
 public/download/
 server/.cache/
+build.json

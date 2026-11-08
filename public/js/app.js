@@ -1144,6 +1144,12 @@ function applyGlass() {
    ===================================================================== */
 async function connectServer() {
   server = await ytmusic.detect(prefs.get('serverUrl'));
+  // The server updates itself; say so once when a new version shows up.
+  if (server?.build) {
+    const seen = prefs.get('serverBuild');
+    if (seen && seen !== server.build) setTimeout(() => toast(t('updated', { v: server.version })), 1200);
+    prefs.set('serverBuild', server.build);
+  }
   player.refreshSource();
   render();
   syncPlayer();
@@ -1210,6 +1216,8 @@ function init() {
 
   player.addEventListener('state', () => { syncPlayer(); fillRadio(); });
   player.addEventListener('time', syncTime);
+  player.lookupDuration = (tr) => (server && tr.source === 'ytmusic' ? ytmusic.meta(tr) : Promise.resolve(0));
+  player.addEventListener('duration', (e) => playlists.setDuration(e.detail.track.id, e.detail.track.duration));
   player.addEventListener('loading', () => {
     const on = player.loading;
     for (const b of [mini.play, bar.play, np.play]) b?.classList.toggle('loading', on);

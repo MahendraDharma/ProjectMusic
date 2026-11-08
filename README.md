@@ -74,6 +74,10 @@ With the personal server (YouTube Music, lyrics, share cards) — see the
 
 Then open <http://localhost:8080>.
 
+**Updates are automatic.** A server installed from the download ZIP checks for a new version when it
+starts and every 3 hours, installs it, and restarts once no music is playing — no need to download again.
+Turn it off with `PM_AUTO_UPDATE=0` or `--no-update`. (A `git clone` is never touched: use `git pull`.)
+
 ## Deploy for free (GitHub Pages)
 
 1. **Settings → Pages → Source: GitHub Actions**.

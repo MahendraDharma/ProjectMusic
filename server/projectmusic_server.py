@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.5.2"
+VERSION = "0.6.0"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -421,6 +421,15 @@ def open_audio(vid: str):
         return info, up, up.total_size()
 
 
+def api_meta(q):
+    """Real length of a song (from the audio lookup, usually already cached). The app asks
+    when its own data has no length, so the bar can't run past the end in Safari."""
+    vid = (q.get("id") or [""])[0]
+    if not VIDEO_ID.match(vid):
+        raise ValueError("id lagu tidak valid")
+    return {"duration": resolve_audio(vid).get("duration") or 0}
+
+
 _prepare_slots = threading.BoundedSemaphore(3)
 
 
@@ -775,6 +784,7 @@ def api_health(_q):
         "ok": True,
         "mode": "server",
         "version": VERSION,
+        "build": _build().get("commit", ""),
         "country": COUNTRY,
         "ytdlp": yt_dlp.version.__version__,
         "jsRuntime": bool(shutil.which("deno") or shutil.which("node") or shutil.which("bun")),
@@ -790,6 +800,7 @@ API = {
     "/api/next": api_next,
     "/api/lyrics": api_lyrics,
     "/api/prepare": api_prepare,
+    "/api/meta": api_meta,
     "/api/import": api_import,
     "/api/match": api_match,
 }
@@ -888,6 +899,7 @@ def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
         "title": info.get("title") or vid,
         "size": int(fmt.get("filesize") or 0),  # total bytes; looked up on first request if missing
         "path": path,
+        "duration": int(info.get("duration") or 0),
     }
     # URL audio YouTube berlaku ±6 jam; simpan sedikit lebih singkat.
     ttl = 4 * 3600
@@ -989,7 +1001,14 @@ class Handler(BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
         try:
             if path == "/api/stream":
-                return self._stream(query)
+                with _activity_lock:
+                    _activity["streams"] += 1
+                try:
+                    return self._stream(query)
+                finally:
+                    with _activity_lock:
+                        _activity["streams"] -= 1
+                        _activity["last"] = time.time()
             if path == "/api/image":
                 return self._image(query)
             if path in API:
@@ -1250,6 +1269,119 @@ class Upstream:
 
 
 # --------------------------------------------------------------------------- #
+# Update otomatis: server memperbarui dirinya sendiri dari GitHub Pages, jadi
+# pengguna tidak perlu mengunduh ulang ZIP setiap ada versi baru.
+# --------------------------------------------------------------------------- #
+UPDATE_URL = os.environ.get("PM_UPDATE_URL", "https://mahendradharma.github.io/ProjectMusic/download/")
+BUILD_FILE = ROOT / "build.json"
+UPDATE_EVERY = int(os.environ.get("PM_UPDATE_EVERY", 3 * 3600))
+KEEP = (".venv", ".cache", "__pycache__", ".git")  # never touched by an update
+_activity = {"streams": 0, "last": time.time()}
+_activity_lock = threading.Lock()
+
+
+def _build() -> dict:
+    try:
+        return json.loads(BUILD_FILE.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _updates_enabled() -> bool:
+    if os.environ.get("PM_AUTO_UPDATE", "1").strip().lower() in ("0", "false", "no", "off"):
+        return False
+    if (ROOT / ".git").exists():
+        return False  # a git clone: update it with "git pull" instead
+    return True
+
+
+def _fetch_bytes(url: str, limit: int) -> bytes:
+    req = urllib.request.Request(url + ("&" if "?" in url else "?") + "t=" + str(int(time.time())), headers={"User-Agent": USER_AGENT})
+    with urlopen(req, timeout=30) as r:
+        data = r.read(limit + 1)
+    if len(data) > limit:
+        raise RuntimeError("update file too large")
+    return data
+
+
+def check_update(apply: bool = True) -> str | None:
+    """Download and unpack a newer version if there is one. Returns its commit, or None."""
+    import io
+    import py_compile
+    import tempfile
+    import zipfile
+
+    latest = json.loads(_fetch_bytes(UPDATE_URL + "latest.json", 100_000))
+    commit = str(latest.get("commit") or "")
+    if not commit or commit == _build().get("commit"):
+        return None
+    if not apply:
+        return commit
+    blob = _fetch_bytes(UPDATE_URL + "ProjectMusic.zip", 50_000_000)
+    if latest.get("bytes") and len(blob) != int(latest["bytes"]):
+        raise RuntimeError("update download incomplete")
+    zf = zipfile.ZipFile(io.BytesIO(blob))
+    names = [n for n in zf.namelist() if n.startswith("ProjectMusic/") and not n.endswith("/")]
+    must = {"ProjectMusic/server/projectmusic_server.py", "ProjectMusic/public/index.html"}
+    if not must.issubset(names):
+        raise RuntimeError("update package looks wrong")
+    # Make sure the new server code at least compiles before replacing anything.
+    with tempfile.TemporaryDirectory() as tmp:
+        new_server = Path(tmp) / "projectmusic_server.py"
+        new_server.write_bytes(zf.read("ProjectMusic/server/projectmusic_server.py"))
+        py_compile.compile(str(new_server), doraise=True)
+    old_req = (ROOT / "server" / "requirements.txt").read_bytes() if (ROOT / "server" / "requirements.txt").exists() else b""
+    for name in names:
+        rel = name[len("ProjectMusic/"):]
+        parts = Path(rel).parts
+        if not parts or any(p in KEEP or p == ".." for p in parts) or Path(rel).is_absolute():
+            continue
+        target = ROOT / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmpf = target.with_name(target.name + ".pm-new")
+        tmpf.write_bytes(zf.read(name))
+        os.replace(tmpf, target)
+    BUILD_FILE.write_text(json.dumps({"commit": commit, "version": latest.get("version", "")}), "utf-8")
+    new_req = (ROOT / "server" / "requirements.txt").read_bytes()
+    if new_req != old_req:
+        import subprocess
+
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--upgrade", "-r", str(ROOT / "server" / "requirements.txt")], check=False)
+    return commit
+
+
+def restart():
+    """Start the new version in place of this one."""
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if os.name == "nt":
+        sys.exit(3)  # start.bat starts the server again when it exits with code 3
+    os.execv(sys.executable, [sys.executable, str(Path(__file__).resolve())] + sys.argv[1:])
+
+
+def _idle(minutes: float) -> bool:
+    with _activity_lock:
+        return _activity["streams"] == 0 and time.time() - _activity["last"] > minutes * 60
+
+
+def _update_loop(stop_server):
+    while True:
+        time.sleep(UPDATE_EVERY)
+        try:
+            commit = check_update()
+        except Exception as e:  # offline, GitHub down...: try again later
+            _log(f"update check failed: {e}")
+            continue
+        if not commit:
+            continue
+        _log(f"ProjectMusic updated ({commit}). Restarting when no music is playing…")
+        while not _idle(2):
+            time.sleep(30)
+        stop_server()
+        return
+
+
+# --------------------------------------------------------------------------- #
 def local_addresses() -> list[str]:
     addrs = set()
     try:
@@ -1266,22 +1398,47 @@ def main():
     ap = argparse.ArgumentParser(description="Server pribadi ProjectMusic")
     ap.add_argument("--host", default=os.environ.get("PM_HOST", "0.0.0.0"))
     ap.add_argument("--port", type=int, default=int(os.environ.get("PM_PORT", "8080")))
+    ap.add_argument("--no-update", action="store_true", help="jangan perbarui otomatis")
     args = ap.parse_args()
+    auto_update = _updates_enabled() and not args.no_update
+
+    if auto_update:
+        try:
+            print("Checking for updates…", flush=True)
+            commit = check_update()
+            if commit:
+                print(f"ProjectMusic updated to {commit}. Restarting…", flush=True)
+                restart()
+        except Exception as e:  # offline etc.: just start the current version
+            print(f"(Update check skipped: {e})", flush=True)
 
     _disk_load()
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
+    restart_after = threading.Event()
+    if auto_update:
+        def stop_server():
+            restart_after.set()
+            threading.Thread(target=httpd.shutdown, daemon=True).start()
+
+        threading.Thread(target=_update_loop, args=(stop_server,), daemon=True).start()
     print("=" * 56)
     print(" ProjectMusic server " + VERSION + " sudah jalan!")
     print(f"  • Di perangkat ini : http://localhost:{args.port}")
     for ip in local_addresses():
         print(f"  • Dari HP lain (Wi-Fi sama): http://{ip}:{args.port}")
+    build = _build().get("commit")
+    print("  Update otomatis: " + ("aktif" + (f" (versi {build})" if build else "") if auto_update else "mati"))
     print("  Tekan Ctrl+C untuk berhenti.")
     print("=" * 56)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nServer dihentikan.")
+        return
+    if restart_after.is_set():
+        httpd.server_close()
+        restart()
 
 
 if __name__ == "__main__":

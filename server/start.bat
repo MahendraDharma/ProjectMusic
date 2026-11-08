@@ -14,5 +14,8 @@ if not exist .venv (
 call .venv\Scripts\activate.bat
 python -m pip install -q --upgrade pip >nul 2>nul
 python -m pip install -q --upgrade -r requirements.txt
+REM Exit code 3 = ProjectMusic just updated itself: start the new version.
+:run
 python projectmusic_server.py
+if %errorlevel%==3 goto run
 pause

@@ -3,3 +3,6 @@ docs/desain export-ignore
 docs/logo-pilihan export-ignore
 .github export-ignore
 .gitattributes export-ignore
+
+# Windows batch files need CRLF line endings (labels/goto misbehave otherwise)
+*.bat text eol=crlf
