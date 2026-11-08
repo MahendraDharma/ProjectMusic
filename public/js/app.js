@@ -1009,6 +1009,30 @@ function addFiles(files) {
 }
 
 /* =====================================================================
+   Welcome intro (first visit only): the logo draws itself, features appear
+   ===================================================================== */
+function showIntro() {
+  if (prefs.get('introSeen')) return;
+  const done = () => { prefs.set('introSeen', true); overlay.classList.add('out'); setTimeout(() => overlay.remove(), 400); };
+  const mark = logo(120);
+  mark.classList.add('intro-logo');
+  const items = [['lyrics', t('welcome1')], ['share', t('welcome2')], ['mix', t('welcome3')]]
+    .map(([ic, text], i) => h('li', { style: { animationDelay: 2.3 + i * 0.18 + 's' } }, icon(ic, 22), h('span', {}, text)));
+  const overlay = h('div', { class: 'intro', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('welcomeTitle') },
+    h('div', { class: 'intro-card' },
+      mark,
+      h('h1', {}, t('welcomeTitle')),
+      h('p', { class: 'hint' }, t('welcomeText')),
+      h('ul', {}, items),
+      h('div', { class: 'intro-actions' },
+        h('button', { class: 'btn primary', onclick: done }, t('startListening')),
+        server ? null : h('a', { class: 'btn', href: 'get/', onclick: () => prefs.set('introSeen', true) }, t('setupServer')))));
+  document.body.append(overlay);
+  overlay.querySelector('.btn.primary').focus({ preventScroll: true });
+  overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') done(); });
+}
+
+/* =====================================================================
    Start
    ===================================================================== */
 function init() {
@@ -1066,7 +1090,7 @@ function init() {
 
   render();
   syncPlayer();
-  connectServer();
+  connectServer().then(showIntro);
 
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

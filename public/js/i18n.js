@@ -53,6 +53,9 @@ const EN = {
   browseIndie: 'Indie', browseAudius: 'Indie on Audius', dropFiles: 'Drop music files to play them',
   unknownArtist: 'Unknown artist', localFile: 'Local file', openInYtm: 'Open in YouTube Music', openInAudius: 'Open on Audius',
   languageSet: 'Language: English', setupGuide: 'Download & setup guide',
+  welcomeTitle: 'Welcome to ProjectMusic', welcomeText: 'A free, light music player. No account, no ads.',
+  welcome1: 'Synced lyrics and smooth transitions between songs', welcome2: 'Share songs and lyrics to your Instagram Story',
+  welcome3: 'Mix two songs, and recommendations made on your device', startListening: 'Start listening', setupServer: 'Set up YouTube Music',
 };
 
 const ID = {
@@ -106,6 +109,9 @@ const ID = {
   browseIndie: 'Indie', browseAudius: 'Indie di Audius', dropFiles: 'Lepaskan file musik untuk memutarnya',
   unknownArtist: 'Artis tidak diketahui', localFile: 'File lokal', openInYtm: 'Buka di YouTube Music', openInAudius: 'Buka di Audius',
   languageSet: 'Bahasa: Indonesia', setupGuide: 'Unduh & panduan',
+  welcomeTitle: 'Selamat datang di ProjectMusic', welcomeText: 'Pemutar musik gratis dan ringan. Tanpa akun, tanpa iklan.',
+  welcome1: 'Lirik tersinkron dan transisi halus antar lagu', welcome2: 'Bagikan lagu dan lirik ke Instagram Story',
+  welcome3: 'Mix dua lagu, dan rekomendasi yang dibuat di perangkatmu', startListening: 'Mulai mendengarkan', setupServer: 'Pasang YouTube Music',
 };
 
 const DICTS = { en: EN, id: ID };

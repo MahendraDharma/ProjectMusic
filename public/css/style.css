@@ -446,6 +446,31 @@ body.dragging .drop { display: grid; }
   .grab { display: none; }
 }
 
+/* ---------------------------------------------------------------- welcome intro */
+.intro { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px;
+  background: radial-gradient(90% 60% at 50% 30%, #2a1a20, rgba(10, 11, 12, .97) 70%); animation: intro-in .4s ease-out; }
+.intro.out { opacity: 0; transition: opacity .35s; }
+.intro-card { width: min(420px, 100%); text-align: center; }
+.intro-logo { margin: 0 auto 22px; display: block; filter: drop-shadow(0 24px 50px rgba(255, 55, 95, .22)); }
+.intro-logo rect { animation: intro-bg .6s cubic-bezier(.22, 1, .36, 1) both; transform-origin: center; transform-box: fill-box; }
+.intro-logo path, .intro-logo circle[fill="none"] { stroke-dasharray: 1600; stroke-dashoffset: 1600; animation: intro-draw .9s .3s cubic-bezier(.65, 0, .35, 1) forwards; }
+.intro-logo circle[fill="none"] { animation-delay: .7s; animation-duration: 1s; }
+.intro-logo path:nth-of-type(2), .intro-logo path:nth-of-type(3) { stroke-dasharray: 300; stroke-dashoffset: 300; animation: intro-draw .35s 1.8s ease-out forwards; }
+.intro-logo path:nth-of-type(3) { animation-delay: 2s; }
+.intro-logo circle:not([fill="none"]) { transform-box: fill-box; transform-origin: center; transform: scale(0); animation: intro-pop .5s 1.55s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+.intro h1 { font-weight: 500; font-size: 28px; letter-spacing: -0.02em; margin-bottom: 6px; animation: intro-rise .6s 1.5s both; }
+.intro .hint { animation: intro-rise .6s 1.65s both; }
+.intro ul { list-style: none; padding: 0; margin: 26px 0; display: grid; gap: 12px; text-align: left; }
+.intro li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--card); animation: intro-rise .6s both; }
+.intro li .ic { color: var(--accent); }
+.intro-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; animation: intro-rise .6s 2.9s both; }
+@keyframes intro-in { from { opacity: 0; } }
+@keyframes intro-bg { from { transform: scale(.85); opacity: 0; } }
+@keyframes intro-draw { to { stroke-dashoffset: 0; } }
+@keyframes intro-pop { to { transform: scale(1); } }
+@keyframes intro-rise { from { opacity: 0; transform: translateY(14px); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+  .intro-logo path, .intro-logo circle { stroke-dashoffset: 0 !important; transform: none !important; }
 }
