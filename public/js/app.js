@@ -704,11 +704,11 @@ function buildBar() {
 function bindSeek(input, curLabel) {
   input.addEventListener('input', () => {
     input.dataset.seeking = '1';
-    curLabel.textContent = fmt((input.value / 1000) * (player.audio.duration || 0));
+    curLabel.textContent = fmt((input.value / 1000) * player.duration);
     input.style.setProperty('--p', input.value / 10 + '%');
   });
   input.addEventListener('change', () => {
-    player.seek((input.value / 1000) * (player.audio.duration || 0));
+    player.seek((input.value / 1000) * player.duration);
     delete input.dataset.seeking;
   });
 }
@@ -982,7 +982,7 @@ async function openSharePreview(kind, lines, tr) {
   const draw = async () => {
     busy.hidden = false;
     const palette = swatches[sw][1];
-    const position = player.audio.duration ? Math.min(0.95, player.audio.currentTime / player.audio.duration) : 0.4;
+    const position = player.duration ? Math.min(0.95, player.audio.currentTime / player.duration) : 0.4;
     const canvas = mode === 'lyrics'
       ? await share.lyricsCard({ track: tr, lines, img, palette, accent })
       : await share.songCard({ track: tr, img, palette, accent, position: position || 0.4 });
@@ -1078,7 +1078,7 @@ function syncPlayer() {
 
 function syncTime() {
   const a = player.audio;
-  const dur = Number.isFinite(a.duration) ? a.duration : player.current?.duration || 0;
+  const dur = player.duration;
   const ratio = dur ? Math.min(1, a.currentTime / dur) : 0;
   if (mini.bar) mini.bar.style.width = `calc((100% - 16px) * ${ratio.toFixed(4)})`;
   for (const [input, cur, total] of [[bar.seek, bar.cur, bar.dur], [np.seek, np.cur, np.dur]]) {

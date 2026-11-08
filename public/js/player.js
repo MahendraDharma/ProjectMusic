@@ -50,6 +50,18 @@ class Player extends EventTarget {
   get playing() {
     return !this.audio.paused;
   }
+  /**
+   * Length of the current song in seconds. Safari sometimes misreads streamed audio
+   * (e.g. a 4:50 song shown as 9:39), so when the catalogue length disagrees clearly
+   * with what the browser reports, trust the catalogue.
+   */
+  get duration() {
+    const d = this.audio.duration;
+    const known = this.current?.duration || 0;
+    const ok = Number.isFinite(d) && d > 0;
+    if (known > 0 && (!ok || Math.abs(d - known) > Math.max(8, known * 0.15))) return known;
+    return ok ? d : 0;
+  }
   get volume() {
     return this._volume;
   }
@@ -220,7 +232,7 @@ class Player extends EventTarget {
     this._emit('time');
     this._updatePosition();
     // Start the crossfade a few seconds before the end.
-    const d = a.duration;
+    const d = this.duration;
     const fade = this.fadeSeconds;
     // Start buffering the next song ~8 s before the fade, so it comes in without a gap.
     if (!this._fade && this.canFade && fade > 0 && Number.isFinite(d) && d - t <= fade + 8 && !a.paused
@@ -312,7 +324,7 @@ class Player extends EventTarget {
 
   _finishListen() {
     const t = this.current;
-    if (t) this._emit('listened', { track: t, listened: this._listened, duration: this.audio.duration || t.duration || 0 });
+    if (t) this._emit('listened', { track: t, listened: this._listened, duration: this.duration || t.duration || 0 });
     this._listened = 0;
     this._lastTime = 0;
   }
@@ -328,9 +340,12 @@ class Player extends EventTarget {
 
   _watchdog() {
     const a = this.audio;
-    if (this._fade || a.paused || !Number.isFinite(a.duration) || a.duration <= 0) return;
+    const d = this.duration;
+    if (this._fade || a.paused || d <= 0) return;
+    // Past the real end (the browser thinks the song is longer): move on.
+    if (a.currentTime > d + 1.5) { this._onEnded(); return; }
     // Only near the end: a stall in the middle is just slow network and should keep waiting.
-    if (a.currentTime < a.duration - 5) { this._stuck = { t: -1, since: 0 }; return; }
+    if (a.currentTime < d - 5) { this._stuck = { t: -1, since: 0 }; return; }
     if (a.currentTime !== this._stuck.t) { this._stuck = { t: a.currentTime, since: Date.now() }; return; }
     if (Date.now() - this._stuck.since > 3000) this._onEnded();
   }
@@ -391,12 +406,13 @@ class Player extends EventTarget {
   _updatePosition() {
     const a = this.audio;
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
-    if (!Number.isFinite(a.duration) || a.duration <= 0) return;
+    const d = this.duration;
+    if (d <= 0) return;
     const now = Date.now();
     if (now - (this._lastPos || 0) < 5000) return;
     this._lastPos = now;
     try {
-      navigator.mediaSession.setPositionState({ duration: a.duration, position: Math.min(a.currentTime, a.duration), playbackRate: a.playbackRate });
+      navigator.mediaSession.setPositionState({ duration: d, position: Math.min(a.currentTime, d), playbackRate: a.playbackRate });
     } catch { /* ignore */ }
   }
 
