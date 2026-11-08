@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -397,12 +397,32 @@ def api_lyrics(q):
     return cached(f"lyrics:{vid}:{title}:{artist}", 6 * 3600, load)
 
 
+_prepare_slots = threading.BoundedSemaphore(3)
+
+
+def _prepare(vid: str):
+    try:
+        info = resolve_audio(vid)
+        if not info.get("size"):  # learn the file size now, saving a round trip at play time
+            up = Upstream(info)
+            try:
+                up.total_size()
+            finally:
+                up.close()
+    finally:
+        _prepare_slots.release()
+
+
 def api_prepare(q):
-    """Look up the audio link of an upcoming song in the background, so it starts
-    instantly when its turn comes (yt-dlp needs a few seconds per song)."""
+    """Look up the audio link of a song the person is likely to play next (the next
+    song in the queue, or one they are touching / hovering), so it starts right away.
+    yt-dlp needs a few seconds per song. At most 3 lookups run at once, so scrolling
+    through a list can't flood YouTube."""
     vid = (q.get("id") or [""])[0]
-    if VIDEO_ID.match(vid) and cache.get("audio:" + vid) is None:
-        threading.Thread(target=lambda: _quiet(resolve_audio, vid), daemon=True).start()
+    hit = cache.get("audio:" + vid) if VIDEO_ID.match(vid) else True
+    if not hit or (isinstance(hit, dict) and not hit.get("size")):
+        if _prepare_slots.acquire(blocking=False):
+            threading.Thread(target=lambda: _quiet(_prepare, vid), daemon=True).start()
     return {"ok": True}
 
 
@@ -763,12 +783,45 @@ VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio"
 
 
+_inflight: dict = {}
+_inflight_lock = threading.Lock()
+
+
 def resolve_audio(vid: str, fresh: bool = False) -> dict:
+    """Audio link for a song. If the same song is already being looked up (e.g. it was
+    prepared in the background and then tapped), wait for that lookup instead of
+    starting a second one."""
     key = "audio:" + vid
     if not fresh:
         hit = cache.get(key)
         if hit:
             return hit
+    with _inflight_lock:
+        pending = None if fresh else _inflight.get(vid)
+        if pending is None:
+            pending = _inflight[vid] = {"event": threading.Event(), "result": None, "error": None}
+            mine = True
+        else:
+            mine = False
+    if not mine:
+        pending["event"].wait(60)
+        if pending["result"]:
+            return pending["result"]
+        raise pending["error"] or RuntimeError("audio lookup timed out")
+    try:
+        pending["result"] = _resolve_audio(vid, key)
+        return pending["result"]
+    except Exception as e:
+        pending["error"] = e
+        raise
+    finally:
+        pending["event"].set()
+        with _inflight_lock:
+            if _inflight.get(vid) is pending:
+                del _inflight[vid]
+
+
+def _resolve_audio(vid: str, key: str) -> dict:
     opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)

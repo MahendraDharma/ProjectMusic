@@ -548,3 +548,12 @@ body.dragging .drop { display: grid; }
   .side-lib img.lib-ic { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; }
 }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+/* Play button while a song is being fetched: a thin spinning ring */
+.icon-btn.loading, .play-sm.loading, .play-lg.loading { position: relative; }
+.icon-btn.loading::after, .play-sm.loading::after, .play-lg.loading::after {
+  content: ""; position: absolute; inset: 1px; border-radius: 50%; pointer-events: none;
+  border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent);
+  animation: spin .9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .loading::after { animation-duration: 2.4s; } }
