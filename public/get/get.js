@@ -52,17 +52,25 @@
   }
   function paintStatus() {
     const text = {
-      en: { wait: 'Checking for your server…', on: (s) => `Your server is running (${s.base.replace(/\/$/, '')}). You're ready to listen.`, off: 'No server running on this device yet. Follow the steps below, then this turns green.' },
-      id: { wait: 'Mengecek server…', on: (s) => `Server kamu menyala (${s.base.replace(/\/$/, '')}). Siap mendengarkan.`, off: 'Belum ada server yang menyala di perangkat ini. Ikuti langkah di bawah, nanti status ini jadi hijau.' },
+      en: { wait: 'Checking for your server…', on: (s) => `Your server is running (${s.base.replace(/\/$/, '')}). You're ready to listen.`, off: 'No server running on this device yet. Follow the steps below, then this turns green.',
+        safari: 'Safari can’t check your server from this page. If it’s running, open it directly:', ios: 'iPhone and iPad can’t check your server from this page. Open your server’s address (shown in the server window) directly in Safari.' },
+      id: { wait: 'Mengecek server…', on: (s) => `Server kamu menyala (${s.base.replace(/\/$/, '')}). Siap mendengarkan.`, off: 'Belum ada server yang menyala di perangkat ini. Ikuti langkah di bawah, nanti status ini jadi hijau.',
+        safari: 'Safari tidak bisa mengecek server dari halaman ini. Kalau server sudah menyala, buka langsung:', ios: 'iPhone dan iPad tidak bisa mengecek server dari halaman ini. Buka alamat server (tertera di jendela server) langsung di Safari.' },
     }[lang];
     document.querySelectorAll('[data-status]').forEach((el) => {
       el.classList.toggle('on', !!server);
-      el.querySelector('[data-status-text]').textContent = !checked ? text.wait : server ? text.on(server) : text.off;
+      const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox|OPR/.test(ua);
+      // WebKit (Safari, all iPhone browsers) blocks this https page from reaching the server,
+      // so "not found" may just mean "not visible from here": offer the direct address.
+      const blocked = location.protocol === 'https:' && !server && (safari || ios);
+      const textEl = el.querySelector('[data-status-text]');
+      textEl.textContent = !checked ? text.wait : server ? text.on(server) : blocked ? (ios ? text.ios : text.safari) : text.off;
+      el.classList.toggle('warn', checked && blocked);
       const open = el.querySelector('[data-open]');
-      open.hidden = !server;
-      // The site connects to the server by itself; Safari may block that, so offer the direct address there.
-      const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox|FxiOS|CriOS/.test(ua);
-      open.href = server && safari ? server.base : '../';
+      const saved = normalize(read().serverUrl) || 'http://localhost:8080/';
+      open.hidden = !server && !(checked && blocked && !ios);
+      open.href = server ? (safari || ios ? server.base : '../') : saved;
     });
   }
   check();

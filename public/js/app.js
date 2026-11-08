@@ -243,7 +243,7 @@ const pages = {
     show(
       homeHead(isHome ? greeting() : t('browseAudius'), isHome),
       isHome && quick.length ? quickGrid(quick) : null,
-      isHome ? h('a', { class: 'notice', href: 'get/' }, h('span', { class: 'dot off' }), h('span', { class: 'row-text' }, h('b', {}, t('serverOff')), h('small', {}, t('serverOffHint')))) : null,
+      isHome ? serverOffNotice() : null,
       sectionHead(t('trendingWeek')), chips, listBox,
       h('p', { class: 'hint' }, t('audiusCredit')),
     );
@@ -462,6 +462,35 @@ function pickTrackSheet(onPick) {
     }, 350);
   });
   openSheet([h('h2', { class: 'sheet-title' }, t('chooseSong')), h('label', { class: 'field' }, icon('search', 20), input), list], { label: t('chooseSong'), wide: true });
+}
+
+/* Safari (Mac) and every browser on iPhone/iPad use WebKit, which blocks a secure
+   site like GitHub Pages from talking to http://localhost or a Wi-Fi address. The server
+   may be running fine — the page just can't see it, so explain and offer a direct link. */
+function webkitBlocksServer() {
+  if (location.protocol !== 'https:') return false;
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox|OPR/.test(ua);
+  return ios ? 'ios' : safari ? 'safari' : false;
+}
+
+function serverOffNotice() {
+  const blocked = webkitBlocksServer();
+  if (!blocked) {
+    return h('a', { class: 'notice', href: 'get/' }, h('span', { class: 'dot off' }),
+      h('span', { class: 'row-text' }, h('b', {}, t('serverOff')), h('small', {}, t('serverOffHint'))));
+  }
+  const target = prefs.get('serverUrl') || ytmusic.DEFAULT_SERVER;
+  return h('div', { class: 'notice safari' }, h('span', { class: 'dot warn' }),
+    h('span', { class: 'row-text wrap' },
+      h('b', {}, t('safariTitle')),
+      h('small', {}, t(blocked === 'ios' ? 'safariIosHint' : 'safariHint')),
+      h('span', { class: 'notice-actions' },
+        blocked === 'ios'
+          ? h('a', { class: 'btn primary small', href: '#/settings' }, t('safariSetAddress'))
+          : h('a', { class: 'btn primary small', href: target }, t('safariOpen', { url: target.replace(/^https?:\/\//, '').replace(/\/$/, '') })),
+        h('a', { class: 'btn small', href: 'get/' }, t('setupGuide')))));
 }
 
 function serverStatusLine() {

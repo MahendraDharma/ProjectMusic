@@ -44,6 +44,7 @@ h3 { font-weight: 500; font-size: 17px; margin: 0 0 6px; }
 .status.on .dot { background: var(--ok); box-shadow: 0 0 0 4px rgba(48, 209, 88, .18); }
 .status-text { flex: 1; min-width: 200px; }
 .status.on .status-text { color: var(--ink); font-weight: 500; }
+.status.warn .dot { background: #FF9F0A; }
 
 .cta { display: flex; flex-wrap: wrap; gap: 10px; }
 .btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; border-radius: 999px; background: var(--raised); font-weight: 500; text-decoration: none; }
