@@ -118,7 +118,7 @@ h1, h2, h3, p { margin: 0; }
 .row-text small { color: var(--ink2); font-size: 13px; font-variant-numeric: tabular-nums; }
 .row.playing .row-text b { color: var(--accent); }
 
-.cards { display: flex; gap: 12px; overflow-x: auto; margin: 0 -20px; padding: 0 20px 6px; scroll-snap-type: x proximity; scrollbar-width: none; }
+.cards { display: flex; gap: 12px; overflow-x: auto; margin: 0 -20px; padding: 0 20px 6px; scroll-snap-type: x proximity; scrollbar-width: none; scroll-padding-inline: 20px; }
 .cards::-webkit-scrollbar { display: none; }
 .card { flex: none; width: 140px; text-align: left; scroll-snap-align: start; }
 .card-art { width: 140px; height: 140px; border-radius: 8px; object-fit: cover; background: var(--raised); margin-bottom: 8px; }
