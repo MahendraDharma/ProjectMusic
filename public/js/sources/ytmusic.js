@@ -82,7 +82,10 @@ export function lyrics(track, signal) {
   }, signal);
 }
 
-export const streamUrl = (track) => `${base}api/stream?id=${encodeURIComponent(track.videoId)}`;
+// Title, artist and length help the server find the same song on another audio source.
+const songQuery = (track) => `id=${encodeURIComponent(track.videoId)}&t=${encodeURIComponent(track.title || '')}`
+  + `&a=${encodeURIComponent(track.artist || '')}&d=${Math.round(track.duration || 0)}`;
+export const streamUrl = (track) => `${base}api/stream?${songQuery(track)}`;
 export const downloadUrl = (track) => streamUrl(track) + '&download=1';
 /** Real length of a song in seconds (0 if unknown). */
 export const meta = (track) => api('meta', { id: track.videoId }).then((d) => d.duration || 0).catch(() => 0);
@@ -93,7 +96,7 @@ export function prepare(track) {
   const last = prepared.get(track.videoId);
   if (last && Date.now() - last < 3 * 3600 * 1000) return; // audio links last ~6 h
   prepared.set(track.videoId, Date.now());
-  fetch(`${base}api/prepare?id=${encodeURIComponent(track.videoId)}`)
+  fetch(`${base}api/prepare?${songQuery(track)}`)
     .then((r) => r.json())
     .then((d) => { if (d && d.queued === false) prepared.delete(track.videoId); }) // server busy: ask again later
     .catch(() => prepared.delete(track.videoId));

@@ -35,6 +35,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import soundcloud_source as soundcloud  # noqa: E402
+
 try:
     from ytmusicapi import YTMusic
     import yt_dlp
@@ -187,6 +190,38 @@ def clean_title(title: str, artist: str) -> str:
     return t or (title or "")
 
 
+# Title / artist / length of songs the server has shown, so their audio can also be
+# looked up on SoundCloud (the app sends them too, see song_info).
+_song_meta: dict = {}
+
+
+def _remember_song(vid: str, title: str, artist: str, duration: int):
+    if len(_song_meta) > 20000:
+        _song_meta.clear()
+    _song_meta[vid] = (title, artist, duration)
+
+
+def song_info(vid: str, q: dict) -> tuple:
+    t = (q.get("t") or [""])[0].strip()
+    a = (q.get("a") or [""])[0].strip()
+    d = (q.get("d") or ["0"])[0]
+    known = _song_meta.get(vid) or ("", "", 0)
+    return (t or known[0], a or known[1], int(d) if str(d).isdigit() and int(d) else known[2])
+
+
+SOUNDCLOUD = os.environ.get("PM_SOUNDCLOUD", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def sc_audio(vid: str, title: str, artist: str, duration: int):
+    if not SOUNDCLOUD:
+        return None
+    try:
+        return soundcloud.audio_file(vid, title, artist, duration)
+    except Exception as e:  # never let the extra source break playback
+        _log(f"soundcloud {vid}: {e.__class__.__name__}")
+        return None
+
+
 def track(item: dict) -> dict | None:
     vid = item.get("videoId")
     if not vid:
@@ -196,6 +231,7 @@ def track(item: dict) -> dict | None:
     thumbs = item.get("thumbnails") or item.get("thumbnail") or []
     duration = item.get("duration_seconds") or _seconds(item.get("duration") or item.get("length"))
     album = item.get("album") or {}
+    _remember_song(vid, clean_title(item.get("title") or "", artist), artist, int(duration or 0))
     return {
         "id": "yt:" + vid,
         "videoId": vid,
@@ -405,20 +441,54 @@ def _fast_refused():
         _log("audio: fast lookup links are refused right now, using the full one for 30 min")
 
 
-def open_audio(vid: str):
-    """(info, upstream, total size) for a song, renewing an expired or refused link once."""
-    info = resolve_audio(vid)
+# Songs whose audio YouTube just refused (403). They are answered with an error right
+# away for a while, so the app skips them in about a second instead of waiting for two
+# more lookups, and YouTube is not asked again and again for the same song.
+_blocked: dict = {}
+BLOCKED_FOR = 10 * 60
+
+
+def _open_checked(info: dict):
+    """Upstream + total size, with the link tried once before anything is sent."""
     up = Upstream(info)
     try:
-        return info, up, up.total_size()
-    except UpstreamExpired:
+        total = up.total_size()
+        if not info.get("checked"):
+            up.check()
+        return up, total
+    except Exception:
         up.close()
+        raise
+
+
+def open_audio(vid: str):
+    """(info, upstream, total size) for a song. An old link that is refused is renewed
+    once; a link that was found moments ago and is refused means YouTube is refusing
+    this song from this network right now, so it fails at once."""
+    until = _blocked.get(vid)
+    if until and until > time.time():
+        raise UpstreamExpired()
+    info = resolve_audio(vid)
+    try:
+        up, total = _open_checked(info)
+        return info, up, total
+    except UpstreamExpired:
         cache.drop("audio:" + vid)
         if info.get("path") == "fast":
             _fast_refused()
-        info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
-        up = Upstream(info)
-        return info, up, up.total_size()
+        elif time.time() - info.get("found", 0) < 120:
+            _blocked[vid] = time.time() + BLOCKED_FOR
+            _log(f"audio {vid}: refused by YouTube, skipping it for {BLOCKED_FOR // 60} min")
+            raise
+    info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
+    try:
+        up, total = _open_checked(info)
+        return info, up, total
+    except UpstreamExpired:
+        cache.drop("audio:" + vid)
+        _blocked[vid] = time.time() + BLOCKED_FOR
+        _log(f"audio {vid}: refused by YouTube, skipping it for {BLOCKED_FOR // 60} min")
+        raise
 
 
 def api_meta(q):
@@ -431,6 +501,17 @@ def api_meta(q):
 
 
 _prepare_slots = threading.BoundedSemaphore(3)
+
+
+def _prepare_any(vid: str, song: tuple):
+    """SoundCloud first; only if it has no good match, the YouTube link."""
+    try:
+        if sc_audio(vid, *song):
+            return
+        _, up, _ = open_audio(vid)
+        up.close()
+    finally:
+        _prepare_slots.release()
 
 
 def _prepare(vid: str):
@@ -447,8 +528,19 @@ def api_prepare(q):
     yt-dlp needs a few seconds per song. At most 3 lookups run at once, so scrolling
     through a list can't flood YouTube."""
     vid = (q.get("id") or [""])[0]
+    if VIDEO_ID.match(vid) and SOUNDCLOUD and not soundcloud.cached(vid):
+        song = song_info(vid, q)
+        if song[0] and not soundcloud.known_miss(vid):
+            if not _prepare_slots.acquire(blocking=False):
+                return {"ok": True, "queued": False}
+            threading.Thread(target=lambda: _quiet(_prepare_any, vid, song), daemon=True).start()
+            return {"ok": True, "queued": True}
+    if VIDEO_ID.match(vid) and soundcloud.cached(vid):
+        return {"ok": True, "queued": True, "ready": True}
+    if _blocked.get(vid, 0) > time.time():
+        return {"ok": True, "queued": False, "blocked": True}
     hit = cache.get("audio:" + vid) if VIDEO_ID.match(vid) else True
-    if not hit or (isinstance(hit, dict) and not hit.get("size")):
+    if not hit or (isinstance(hit, dict) and not (hit.get("size") and hit.get("checked"))):
         if not _prepare_slots.acquire(blocking=False):
             return {"ok": True, "queued": False}  # busy: the app may ask again later
         threading.Thread(target=lambda: _quiet(_prepare, vid), daemon=True).start()
@@ -788,6 +880,8 @@ def api_health(_q):
         "country": COUNTRY,
         "ytdlp": yt_dlp.version.__version__,
         "jsRuntime": bool(shutil.which("deno") or shutil.which("node") or shutil.which("bun")),
+        "cookies": COOKIE_FILE is not None,
+        "soundcloud": SOUNDCLOUD,
     }
 
 
@@ -863,10 +957,40 @@ def _log(msg: str):
     sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), msg))
 
 
+# Optional: cookies of a (spare) YouTube account, for networks where YouTube asks to
+# "confirm you're not a bot". Set PM_COOKIES to a Netscape cookies.txt file. It is
+# copied into .cache first, because yt-dlp writes refreshed cookies back to the file.
+COOKIES_SRC = os.environ.get("PM_COOKIES", "").strip()
+COOKIE_FILE: Path | None = None
+
+
+def _prepare_cookies():
+    global COOKIE_FILE
+    if not COOKIES_SRC:
+        return
+    src = Path(COOKIES_SRC).expanduser()
+    try:
+        text = src.read_text("utf-8")
+    except OSError as e:
+        _log(f"cookies: cannot read {src} ({e.__class__.__name__}), continuing without")
+        return
+    if ".youtube.com" not in text:
+        _log("cookies: file has no youtube.com cookies, continuing without")
+        return
+    dst = Path(__file__).resolve().parent / ".cache" / "cookies.txt"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(text, "utf-8")
+    os.chmod(dst, 0o600)
+    COOKIE_FILE = dst
+    _log("cookies: using the YouTube cookies from PM_COOKIES")
+
+
 def _extract(vid: str, extractor_args: dict | None):
     opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
     if extractor_args:
         opts["extractor_args"] = extractor_args
+    if COOKIE_FILE:
+        opts["cookiefile"] = str(COOKIE_FILE)
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
 
@@ -900,6 +1024,7 @@ def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
         "size": int(fmt.get("filesize") or 0),  # total bytes; looked up on first request if missing
         "path": path,
         "duration": int(info.get("duration") or 0),
+        "found": time.time(),
     }
     # URL audio YouTube berlaku ±6 jam; simpan sedikit lebih singkat.
     ttl = 4 * 3600
@@ -1067,6 +1192,47 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
 
     # ---- audio ----------------------------------------------------------- #
+    def _send_audio_file(self, path: Path, download: bool, title: str):
+        """A cached audio file, with Range support (Safari asks for byte ranges)."""
+        total = path.stat().st_size
+        start, end, partial = 0, total - 1, False
+        m = re.match(r"bytes=(\d*)-(\d*)$", self.headers.get("Range", "").strip())
+        if m and (m.group(1) or m.group(2)):
+            partial = True
+            if m.group(1):
+                start = int(m.group(1))
+                end = min(int(m.group(2)), total - 1) if m.group(2) else total - 1
+            else:
+                start = max(0, total - int(m.group(2)))
+        if start >= total or start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{total}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(206 if partial else 200)
+        self.send_header("Content-Type", "audio/mp4")
+        self.send_header("Content-Length", str(end - start + 1))
+        if partial:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{total}")
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Cache-Control", "no-store")
+        if download:
+            safe = re.sub(r'[\\/:*?"<>|]+', " ", title).strip()[:120] or "song"
+            self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(safe + ".m4a"))
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        with open(path, "rb") as f:
+            f.seek(start)
+            left = end - start + 1
+            while left > 0:
+                data = f.read(min(256 * 1024, left))
+                if not data:
+                    break
+                self.wfile.write(data)
+                left -= len(data)
+
     def _stream(self, query):
         """Send the audio to the browser.
 
@@ -1078,6 +1244,15 @@ class Handler(BaseHTTPRequestHandler):
         if not VIDEO_ID.match(vid):
             raise ValueError("id lagu tidak valid")
         download = (query.get("download") or ["0"])[0] == "1"
+
+        # 1) The same song from SoundCloud, if it is there (fast, not blocked by YouTube).
+        #    A YouTube link that is already known to work is used as is.
+        hit = cache.get("audio:" + vid)
+        if not (hit and hit.get("checked")):
+            song = song_info(vid, query)
+            path = sc_audio(vid, *song)
+            if path:
+                return self._send_audio_file(path, download, song[0] or vid)
 
         t0 = time.time()
         info, up, total = open_audio(vid)
@@ -1207,7 +1382,9 @@ class Upstream:
     def _request(self, first: int, last: int):
         headers = dict(self.info["headers"])
         headers["Range"] = f"bytes={first}-{last}"
-        for attempt in range(3):
+        redirects = 0
+        attempt = 0
+        while attempt < 3:
             try:
                 conn = self._connect()
                 self.clean = False
@@ -1215,8 +1392,23 @@ class Upstream:
                 resp = conn.getresponse()
             except (http.client.HTTPException, OSError):
                 self.close()  # stale keep-alive connection: reconnect
-                if attempt == 2:
+                attempt += 1
+                if attempt == 3:
                     raise
+                continue
+            if resp.status in (301, 302, 303, 307, 308) and redirects < 5:
+                # The audio host may send us to another server: follow it.
+                loc = resp.getheader("Location") or ""
+                resp.read()
+                self.clean = True
+                if not loc:
+                    raise RuntimeError(f"audio host answered {resp.status} without Location")
+                u = urllib.parse.urlsplit(urllib.parse.urljoin(f"{'https' if self.https else 'http'}://{self.host}{self.path}", loc))
+                self.close()
+                self.https = u.scheme == "https"
+                self.host = u.netloc
+                self.path = u.path + ("?" + u.query if u.query else "")
+                redirects += 1
                 continue
             if resp.status in (403, 410):
                 resp.read()
@@ -1244,7 +1436,16 @@ class Upstream:
         if not size:
             raise RuntimeError("unknown audio size")
         self.info["size"] = size
+        self.info["checked"] = True
         return size
+
+    def check(self):
+        """Ask for one byte, so a refused link fails before the browser gets an answer
+        (a 502 makes the app skip at once; a broken 206 makes it wait for a timeout)."""
+        resp = self._request(0, 0)
+        resp.read()
+        self.clean = True
+        self.info["checked"] = True
 
     def read_range(self, first: int, last: int):
         resp = self._request(first, last)
@@ -1412,6 +1613,8 @@ def main():
         except Exception as e:  # offline etc.: just start the current version
             print(f"(Update check skipped: {e})", flush=True)
 
+    _prepare_cookies()
+    soundcloud.set_logger(_log)
     _disk_load()
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
