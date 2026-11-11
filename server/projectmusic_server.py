@@ -405,20 +405,54 @@ def _fast_refused():
         _log("audio: fast lookup links are refused right now, using the full one for 30 min")
 
 
-def open_audio(vid: str):
-    """(info, upstream, total size) for a song, renewing an expired or refused link once."""
-    info = resolve_audio(vid)
+# Songs whose audio YouTube just refused (403). They are answered with an error right
+# away for a while, so the app skips them in about a second instead of waiting for two
+# more lookups, and YouTube is not asked again and again for the same song.
+_blocked: dict = {}
+BLOCKED_FOR = 10 * 60
+
+
+def _open_checked(info: dict):
+    """Upstream + total size, with the link tried once before anything is sent."""
     up = Upstream(info)
     try:
-        return info, up, up.total_size()
-    except UpstreamExpired:
+        total = up.total_size()
+        if not info.get("checked"):
+            up.check()
+        return up, total
+    except Exception:
         up.close()
+        raise
+
+
+def open_audio(vid: str):
+    """(info, upstream, total size) for a song. An old link that is refused is renewed
+    once; a link that was found moments ago and is refused means YouTube is refusing
+    this song from this network right now, so it fails at once."""
+    until = _blocked.get(vid)
+    if until and until > time.time():
+        raise UpstreamExpired()
+    info = resolve_audio(vid)
+    try:
+        up, total = _open_checked(info)
+        return info, up, total
+    except UpstreamExpired:
         cache.drop("audio:" + vid)
         if info.get("path") == "fast":
             _fast_refused()
-        info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
-        up = Upstream(info)
-        return info, up, up.total_size()
+        elif time.time() - info.get("found", 0) < 120:
+            _blocked[vid] = time.time() + BLOCKED_FOR
+            _log(f"audio {vid}: refused by YouTube, skipping it for {BLOCKED_FOR // 60} min")
+            raise
+    info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
+    try:
+        up, total = _open_checked(info)
+        return info, up, total
+    except UpstreamExpired:
+        cache.drop("audio:" + vid)
+        _blocked[vid] = time.time() + BLOCKED_FOR
+        _log(f"audio {vid}: refused by YouTube, skipping it for {BLOCKED_FOR // 60} min")
+        raise
 
 
 def api_meta(q):
@@ -447,8 +481,10 @@ def api_prepare(q):
     yt-dlp needs a few seconds per song. At most 3 lookups run at once, so scrolling
     through a list can't flood YouTube."""
     vid = (q.get("id") or [""])[0]
+    if _blocked.get(vid, 0) > time.time():
+        return {"ok": True, "queued": False, "blocked": True}
     hit = cache.get("audio:" + vid) if VIDEO_ID.match(vid) else True
-    if not hit or (isinstance(hit, dict) and not hit.get("size")):
+    if not hit or (isinstance(hit, dict) and not (hit.get("size") and hit.get("checked"))):
         if not _prepare_slots.acquire(blocking=False):
             return {"ok": True, "queued": False}  # busy: the app may ask again later
         threading.Thread(target=lambda: _quiet(_prepare, vid), daemon=True).start()
@@ -931,6 +967,7 @@ def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
         "size": int(fmt.get("filesize") or 0),  # total bytes; looked up on first request if missing
         "path": path,
         "duration": int(info.get("duration") or 0),
+        "found": time.time(),
     }
     # URL audio YouTube berlaku ±6 jam; simpan sedikit lebih singkat.
     ttl = 4 * 3600
@@ -1292,7 +1329,16 @@ class Upstream:
         if not size:
             raise RuntimeError("unknown audio size")
         self.info["size"] = size
+        self.info["checked"] = True
         return size
+
+    def check(self):
+        """Ask for one byte, so a refused link fails before the browser gets an answer
+        (a 502 makes the app skip at once; a broken 206 makes it wait for a timeout)."""
+        resp = self._request(0, 0)
+        resp.read()
+        self.clean = True
+        self.info["checked"] = True
 
     def read_range(self, first: int, last: int):
         resp = self._request(first, last)
