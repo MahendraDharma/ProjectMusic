@@ -788,6 +788,7 @@ def api_health(_q):
         "country": COUNTRY,
         "ytdlp": yt_dlp.version.__version__,
         "jsRuntime": bool(shutil.which("deno") or shutil.which("node") or shutil.which("bun")),
+        "cookies": COOKIE_FILE is not None,
     }
 
 
@@ -863,10 +864,40 @@ def _log(msg: str):
     sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), msg))
 
 
+# Optional: cookies of a (spare) YouTube account, for networks where YouTube asks to
+# "confirm you're not a bot". Set PM_COOKIES to a Netscape cookies.txt file. It is
+# copied into .cache first, because yt-dlp writes refreshed cookies back to the file.
+COOKIES_SRC = os.environ.get("PM_COOKIES", "").strip()
+COOKIE_FILE: Path | None = None
+
+
+def _prepare_cookies():
+    global COOKIE_FILE
+    if not COOKIES_SRC:
+        return
+    src = Path(COOKIES_SRC).expanduser()
+    try:
+        text = src.read_text("utf-8")
+    except OSError as e:
+        _log(f"cookies: cannot read {src} ({e.__class__.__name__}), continuing without")
+        return
+    if ".youtube.com" not in text:
+        _log("cookies: file has no youtube.com cookies, continuing without")
+        return
+    dst = Path(__file__).resolve().parent / ".cache" / "cookies.txt"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(text, "utf-8")
+    os.chmod(dst, 0o600)
+    COOKIE_FILE = dst
+    _log("cookies: using the YouTube cookies from PM_COOKIES")
+
+
 def _extract(vid: str, extractor_args: dict | None):
     opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
     if extractor_args:
         opts["extractor_args"] = extractor_args
+    if COOKIE_FILE:
+        opts["cookiefile"] = str(COOKIE_FILE)
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
 
@@ -1412,6 +1443,7 @@ def main():
         except Exception as e:  # offline etc.: just start the current version
             print(f"(Update check skipped: {e})", flush=True)
 
+    _prepare_cookies()
     _disk_load()
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
