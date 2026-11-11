@@ -117,6 +117,7 @@ music from Audius.
 |---|---|
 | Songs are listed but won't play | Stop the server and run the start script again: it updates `yt-dlp`, which usually fixes it. |
 | "not a bot" message | The server is on a network YouTube blocks (VPN, hosting). Run it on home Wi-Fi or mobile data. |
+| "not a bot" even at home | Export `cookies.txt` from a **spare** YouTube account (Netscape format, e.g. with a "Get cookies.txt LOCALLY" browser extension) and start the server with `PM_COOKIES=/path/to/cookies.txt`. `/api/health` then shows `"cookies": true`. YouTube may limit the account used, so never use your main one. |
 | Some songs fail | Some songs are region- or age-restricted by YouTube; skip them. |
 | Charts for another country | `PM_COUNTRY=US sh server/start.sh` |
 | Port 8080 is taken | `sh server/start.sh --port 9090`, then open `http://localhost:9090`. |

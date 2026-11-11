@@ -405,20 +405,54 @@ def _fast_refused():
         _log("audio: fast lookup links are refused right now, using the full one for 30 min")
 
 
-def open_audio(vid: str):
-    """(info, upstream, total size) for a song, renewing an expired or refused link once."""
-    info = resolve_audio(vid)
+# Songs whose audio YouTube just refused (403). They are answered with an error right
+# away for a while, so the app skips them in about a second instead of waiting for two
+# more lookups, and YouTube is not asked again and again for the same song.
+_blocked: dict = {}
+BLOCKED_FOR = 10 * 60
+
+
+def _open_checked(info: dict):
+    """Upstream + total size, with the link tried once before anything is sent."""
     up = Upstream(info)
     try:
-        return info, up, up.total_size()
-    except UpstreamExpired:
+        total = up.total_size()
+        if not info.get("checked"):
+            up.check()
+        return up, total
+    except Exception:
         up.close()
+        raise
+
+
+def open_audio(vid: str):
+    """(info, upstream, total size) for a song. An old link that is refused is renewed
+    once; a link that was found moments ago and is refused means YouTube is refusing
+    this song from this network right now, so it fails at once."""
+    until = _blocked.get(vid)
+    if until and until > time.time():
+        raise UpstreamExpired()
+    info = resolve_audio(vid)
+    try:
+        up, total = _open_checked(info)
+        return info, up, total
+    except UpstreamExpired:
         cache.drop("audio:" + vid)
         if info.get("path") == "fast":
             _fast_refused()
-        info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
-        up = Upstream(info)
-        return info, up, up.total_size()
+        elif time.time() - info.get("found", 0) < 120:
+            _blocked[vid] = time.time() + BLOCKED_FOR
+            _log(f"audio {vid}: refused by YouTube, skipping it for {BLOCKED_FOR // 60} min")
+            raise
+    info = resolve_audio(vid, fresh=True, full=info.get("path") == "fast")
+    try:
+        up, total = _open_checked(info)
+        return info, up, total
+    except UpstreamExpired:
+        cache.drop("audio:" + vid)
+        _blocked[vid] = time.time() + BLOCKED_FOR
+        _log(f"audio {vid}: refused by YouTube, skipping it for {BLOCKED_FOR // 60} min")
+        raise
 
 
 def api_meta(q):
@@ -447,8 +481,10 @@ def api_prepare(q):
     yt-dlp needs a few seconds per song. At most 3 lookups run at once, so scrolling
     through a list can't flood YouTube."""
     vid = (q.get("id") or [""])[0]
+    if _blocked.get(vid, 0) > time.time():
+        return {"ok": True, "queued": False, "blocked": True}
     hit = cache.get("audio:" + vid) if VIDEO_ID.match(vid) else True
-    if not hit or (isinstance(hit, dict) and not hit.get("size")):
+    if not hit or (isinstance(hit, dict) and not (hit.get("size") and hit.get("checked"))):
         if not _prepare_slots.acquire(blocking=False):
             return {"ok": True, "queued": False}  # busy: the app may ask again later
         threading.Thread(target=lambda: _quiet(_prepare, vid), daemon=True).start()
@@ -788,6 +824,7 @@ def api_health(_q):
         "country": COUNTRY,
         "ytdlp": yt_dlp.version.__version__,
         "jsRuntime": bool(shutil.which("deno") or shutil.which("node") or shutil.which("bun")),
+        "cookies": COOKIE_FILE is not None,
     }
 
 
@@ -863,10 +900,40 @@ def _log(msg: str):
     sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), msg))
 
 
+# Optional: cookies of a (spare) YouTube account, for networks where YouTube asks to
+# "confirm you're not a bot". Set PM_COOKIES to a Netscape cookies.txt file. It is
+# copied into .cache first, because yt-dlp writes refreshed cookies back to the file.
+COOKIES_SRC = os.environ.get("PM_COOKIES", "").strip()
+COOKIE_FILE: Path | None = None
+
+
+def _prepare_cookies():
+    global COOKIE_FILE
+    if not COOKIES_SRC:
+        return
+    src = Path(COOKIES_SRC).expanduser()
+    try:
+        text = src.read_text("utf-8")
+    except OSError as e:
+        _log(f"cookies: cannot read {src} ({e.__class__.__name__}), continuing without")
+        return
+    if ".youtube.com" not in text:
+        _log("cookies: file has no youtube.com cookies, continuing without")
+        return
+    dst = Path(__file__).resolve().parent / ".cache" / "cookies.txt"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(text, "utf-8")
+    os.chmod(dst, 0o600)
+    COOKIE_FILE = dst
+    _log("cookies: using the YouTube cookies from PM_COOKIES")
+
+
 def _extract(vid: str, extractor_args: dict | None):
     opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
     if extractor_args:
         opts["extractor_args"] = extractor_args
+    if COOKIE_FILE:
+        opts["cookiefile"] = str(COOKIE_FILE)
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
 
@@ -900,6 +967,7 @@ def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
         "size": int(fmt.get("filesize") or 0),  # total bytes; looked up on first request if missing
         "path": path,
         "duration": int(info.get("duration") or 0),
+        "found": time.time(),
     }
     # URL audio YouTube berlaku ±6 jam; simpan sedikit lebih singkat.
     ttl = 4 * 3600
@@ -1207,7 +1275,9 @@ class Upstream:
     def _request(self, first: int, last: int):
         headers = dict(self.info["headers"])
         headers["Range"] = f"bytes={first}-{last}"
-        for attempt in range(3):
+        redirects = 0
+        attempt = 0
+        while attempt < 3:
             try:
                 conn = self._connect()
                 self.clean = False
@@ -1215,8 +1285,23 @@ class Upstream:
                 resp = conn.getresponse()
             except (http.client.HTTPException, OSError):
                 self.close()  # stale keep-alive connection: reconnect
-                if attempt == 2:
+                attempt += 1
+                if attempt == 3:
                     raise
+                continue
+            if resp.status in (301, 302, 303, 307, 308) and redirects < 5:
+                # The audio host may send us to another server: follow it.
+                loc = resp.getheader("Location") or ""
+                resp.read()
+                self.clean = True
+                if not loc:
+                    raise RuntimeError(f"audio host answered {resp.status} without Location")
+                u = urllib.parse.urlsplit(urllib.parse.urljoin(f"{'https' if self.https else 'http'}://{self.host}{self.path}", loc))
+                self.close()
+                self.https = u.scheme == "https"
+                self.host = u.netloc
+                self.path = u.path + ("?" + u.query if u.query else "")
+                redirects += 1
                 continue
             if resp.status in (403, 410):
                 resp.read()
@@ -1244,7 +1329,16 @@ class Upstream:
         if not size:
             raise RuntimeError("unknown audio size")
         self.info["size"] = size
+        self.info["checked"] = True
         return size
+
+    def check(self):
+        """Ask for one byte, so a refused link fails before the browser gets an answer
+        (a 502 makes the app skip at once; a broken 206 makes it wait for a timeout)."""
+        resp = self._request(0, 0)
+        resp.read()
+        self.clean = True
+        self.info["checked"] = True
 
     def read_range(self, first: int, last: int):
         resp = self._request(first, last)
@@ -1412,6 +1506,7 @@ def main():
         except Exception as e:  # offline etc.: just start the current version
             print(f"(Update check skipped: {e})", flush=True)
 
+    _prepare_cookies()
     _disk_load()
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
