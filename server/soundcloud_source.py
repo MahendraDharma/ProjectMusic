@@ -30,12 +30,20 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 CACHE_DIR = Path(__file__).resolve().parent / ".cache" / "sc"
 MAX_FILES = int(os.environ.get("PM_SC_CACHE_FILES", "400"))
 MISS_FOR = 6 * 3600          # lagu yang tidak ketemu: jangan dicari lagi selama 6 jam
+# Versi lain dalam bahasa Jepang/Korea (tanpa spasi, jadi dicek sebagai potongan teks).
+OTHER_VERSIONS_CJK = ("歌ってみた", "弾いてみた", "叩いてみた", "踊ってみた", "カバー", "リミックス", "オルゴール",
+                      "ピアノ", "アコースティック", "ライブ", "ライヴ", "インスト", "カラオケ", "オフボーカル",
+                      "倍速", "スロー", "原曲", "커버", "리믹스", "라이브", "원곡")
 # Kata yang menandai versi LAIN dari lagu aslinya. Ditolak, kecuali judul aslinya
 # (dari YouTube Music) memang memuat kata itu.
 OTHER_VERSIONS = ("slowed", "sped up", "speed up", "speedup", "nightcore", "remix", "rmx", "bootleg",
                   "cover", "covered", "karaoke", "instrumental", "inst", "minus one", "reverb", "8d",
                   "mashup", "lofi", "lo fi", "live", "acoustic", "akustik", "version", "versi", "mix",
-                  "dj", "edit", "tiktok", "koplo", "funkot", "jedag jedug", "amapiano", "jersey club")
+                  "dj", "edit", "tiktok", "koplo", "funkot", "jedag jedug", "amapiano", "jersey club",
+                  "tribute", "piano", "guitar", "violin", "orchestra", "grammy", "grammys", "performance",
+                  "session", "sessions", "unplugged", "concert", "pitched", "daycore", "original by",
+                  "originally", "parody", "flip", "vip", "rework", "refix", "re edit", "louder", "boosted",
+                  "bass boosted", "extended", "loop", "hour")
 # Kata label yang hanya menjelaskan unggahan (bukan versi lain). Grup dalam kurung atau
 # bagian setelah " - " yang isinya HANYA kata-kata ini dibuang sebelum pengecekan,
 # jadi "(Official Lyric Video)", "[Lirik]", "- Official Audio" tidak ikut menolak.
@@ -44,7 +52,20 @@ LABEL_WORDS = {
     "audio", "visualizer", "visualiser", "mv", "m", "v", "hd", "hq", "4k", "full", "song", "lagu",
     "explicit", "clean", "single", "album", "original", "versi", "version", "ver", "radio", "new",
     "terbaru", "resmi", "with", "dengan", "teks", "text", "of", "the", "and", "dan", "ost",
+    "公式", "オフィシャル", "歌詞", "歌詞付き", "ミュージックビデオ", "フル", "full ver", "뮤직비디오", "가사",
 }
+# Nama artis Latin <-> asli (kana/kanji/hangul), untuk artis yang sering diputar.
+# Unggahan SoundCloud sering memakai salah satunya saja.
+ARTIST_ALIASES = [
+    ("back number", "バックナンバー"), ("YOASOBI", "ヨアソビ"), ("Official HIGE DANdism", "Official髭男dism", "ヒゲダン"),
+    ("Kenshi Yonezu", "米津玄師"), ("Aimyon", "あいみょん"), ("Yorushika", "ヨルシカ"), ("Fujii Kaze", "藤井風"),
+    ("Yuuri", "優里"), ("Utada Hikaru", "宇多田ヒカル"), ("Hikaru Utada", "宇多田ヒカル"), ("Tatsuro Yamashita", "山下達郎"),
+    ("Mariya Takeuchi", "竹内まりや"), ("ZUTOMAYO", "ずっと真夜中でいいのに。"), ("Kenshi Hachiya", "ハチ"),
+    ("Mrs. GREEN APPLE", "ミセスグリーンアップル"), ("King Gnu", "キングヌー"), ("Ado", "アド"), ("Vaundy", "バウンディ"),
+    ("Yama", "ヤマ"), ("Masaki Suda", "菅田将暉"), ("Kana-Boon", "KANA-BOON"), ("Spitz", "スピッツ"),
+    ("Mr.Children", "ミスターチルドレン"), ("Creepy Nuts", "クリーピーナッツ"), ("Eve", "イブ"), ("tuki.", "tuki"),
+    ("IU", "아이유"), ("BTS", "방탄소년단"), ("NewJeans", "뉴진스"),
+]
 NOISE = re.compile(r"\((?:[^)]*)\)|\[(?:[^]]*)\]|\b(official|video|music|lyrics?|lirik|audio|mv|hd|hq|visualizer)\b", re.I)
 _GROUP = re.compile(r"\(([^)]*)\)|\[([^]]*)\]|【([^】]*)】")
 
@@ -106,18 +127,96 @@ def _api(path: str, params: dict | None = None, timeout: float = 8):
 
 
 # --------------------------------------------------------------------------- matching
+def _fold(s: str) -> str:
+    """NFKC + casefold, keeping every script (kana, kanji, hangul, accented Latin).
+    Accents are dropped from Latin letters only, so "Beyoncé" == "Beyonce"."""
+    s = unicodedata.normalize("NFKC", s or "").casefold()
+    out, base = [], ""
+    for c in unicodedata.normalize("NFD", s):
+        if unicodedata.combining(c) and base and ord(base) < 0x250:
+            continue  # accent on a Latin letter: drop (kana dakuten etc. are kept)
+        if not unicodedata.combining(c):
+            base = c
+        out.append(c)
+    return unicodedata.normalize("NFC", "".join(out))
+
+
 def _norm(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", "", s)
+    """Letters and digits only, any script: "クリスマスソング (Christmas Song)" -> "クリスマスソングchristmassong"."""
+    return re.sub(r"[\W_]+", "", _fold(s))
+
+
+_CJK = r"\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af"
 
 
 def _words(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
-    return " " + re.sub(r"[^a-z0-9]+", " ", s).strip() + " "
+    s = re.sub(r"[\W_]+", " ", _fold(s))
+    # "ノリノリremix" -> "ノリノリ remix": a Latin word glued to kana/kanji/hangul is still a word
+    s = re.sub(rf"(?<=[{_CJK}])(?=[a-z0-9])|(?<=[a-z0-9])(?=[{_CJK}])", " ", s)
+    return " " + s.strip() + " "
 
 
 def _core_title(title: str) -> str:
     return _norm(NOISE.sub(" ", title or "")) or _norm(title)
+
+
+def _long_enough(n: str) -> bool:
+    # one CJK character carries much more than one Latin letter
+    return len(n) >= 3 or (len(n) >= 2 and any(ord(c) > 0x2E7F for c in n))
+
+
+# A bracket or " - " part with these words describes a version or a source (not a
+# translated/romaji name), so it is never used on its own as a title.
+_NOT_A_NAME = {"ver", "version", "movie", "tv", "size", "edit", "mix", "remix", "live", "from", "feat", "ft",
+               "prod", "op", "ed", "opening", "ending", "theme", "ost", "cover", "acoustic", "original", "short",
+               "soundtrack", "anime", "film", "drama", "cm", "remaster", "remastered", "mono", "stereo", "demo"}
+
+
+def _is_name(part: str) -> bool:
+    ws = _words(part).split()
+    return bool(ws) and not any(w in _NOT_A_NAME for w in ws) and not all(w in LABEL_WORDS for w in ws)
+
+
+def title_variants(title: str) -> list[str]:
+    """Normalized ways a title can appear: the whole title without labels, plus its parts
+    split on " - " and the text in brackets, e.g. "クリスマスソング - Christmas Song" ->
+    ["クリスマスソングchristmassong", "クリスマスソング", "christmassong"]."""
+    out = []
+
+    def add(t, whole=False):
+        n = _norm(t)
+        # a part that is only a number ("2", "2024") is too vague, but a whole title can be ("505")
+        if n and (_long_enough(n) or whole) and n not in out and (whole or not n.isdigit()):
+            out.append(n)
+
+    add(NOISE.sub(" ", title or ""), whole=True)
+    parts = re.split(r"\s+[-\u2013\u2014/|~]\s+|\s*[/／]\s*", NOISE.sub(" ", title or ""))
+    if len(parts) > 1:
+        for part in parts:
+            if _is_name(part):
+                add(part)
+    for m in _GROUP.finditer(unicodedata.normalize("NFKC", title or "")):
+        inner = next(g for g in m.groups() if g is not None)
+        if _is_name(inner):
+            add(inner)
+    if not out:
+        add(title, whole=True)
+    return out
+
+
+def artist_variants(artist: str) -> list[str]:
+    """Normalized names for the first artist: as written, its parts in brackets, and known
+    Latin/original aliases ("Kenshi Yonezu" <-> "米津玄師")."""
+    first = re.split(r",|&|、| x | ft\.? | feat\.? | with ", artist or "", flags=re.I)[0]
+    names = {_norm(first)}
+    for m in _GROUP.finditer(first):
+        names.add(_norm(next(g for g in m.groups() if g is not None)))
+    names.add(_norm(_GROUP.sub(" ", first)))
+    for group in ARTIST_ALIASES:
+        normed = {_norm(x) for x in group}
+        if names & normed:
+            names |= normed
+    return [n for n in names if n]
 
 
 def _playable(tr: dict):
@@ -146,6 +245,7 @@ def _strip_labels(text: str, keep: str = "") -> str:
         ws = _words(part).split()
         return bool(ws) and all(w in LABEL_WORDS or w in keep_words for w in ws)
 
+    text = unicodedata.normalize("NFKC", text or "")  # full-width ［］（） -> [] ()
     text = _GROUP.sub(lambda m: " " if label_only(next(g for g in m.groups() if g is not None)) else m.group(0), text or "")
     parts = re.split(r"\s+[-\u2013\u2014|]\s+", text)
     return " ".join(p for i, p in enumerate(parts) if i == 0 or not label_only(p))
@@ -154,10 +254,54 @@ def _strip_labels(text: str, keep: str = "") -> str:
 def _other_version(sc_title: str, title: str, artist: str) -> str | None:
     """The word that makes this upload another version (remix, cover, ...), or None."""
     yt_words = _words(title + " " + artist)
-    sc_words = _words(_strip_labels(sc_title, keep=title + " " + artist))
+    stripped = _strip_labels(sc_title, keep=title + " " + artist)
+    sc_words = _words(stripped)
     for w in OTHER_VERSIONS:
         if (" " + w + " ") in sc_words and (" " + w + " ") not in yt_words:
             return w
+    yt_text, sc_text = _norm(title + artist), _norm(stripped)
+    for w in OTHER_VERSIONS_CJK:
+        if w in sc_text and w not in yt_text:
+            return w
+    names = artist_variants(artist) + [_norm(a) for a in re.split(r",|&|、", artist or "")]
+    # "【Singer】Title" or "Title【Singer】": another singer named in 【】 is a cover
+    for inner in re.findall(r"【([^】]+)】", unicodedata.normalize("NFKC", sc_title or "")):
+        n = _norm(inner)
+        if n and not all(w in LABEL_WORDS for w in _words(inner).split()) and not any(a and (a in n or n in a) for a in names) \
+                and not any(v in n for v in title_variants(title)) and not any(w in _NOT_A_NAME for w in _words(inner).split()):
+            return "other singer"
+    # "Title (Original by Artist)" or "... by Pianist": "by" names someone else, or credits the
+    # artist as the original -> a cover
+    folded = _fold(sc_title)
+    for m in re.finditer(r"\bby\.?\s+([^()\[\]\-|]+)", folded):
+        who = _norm(m.group(1))
+        if not who:
+            continue
+        before = folded[: m.start()]
+        if re.search(r"(original|originally|orig|cover|covered|song|sung|performed)\s*$", before.strip()):
+            return "cover"
+        if not any(a and (a in who or who in a) for a in names) and "by" not in _words(title + " " + artist).split():
+            return "other performer"
+    # "Singer - Title": the part of "A - B" that isn't the title must name the artist
+    parts = [p for p in re.split(r"\s*[-\u2013\u2014|]\s+|\s+[-\u2013\u2014|]\s*", _GROUP.sub(" ", unicodedata.normalize("NFKC", sc_title or ""))) if p.strip()]
+    if len(parts) == 2:
+        tv = title_variants(title)
+        title_side = [p for p in parts if any(v in _norm(p) for v in tv)]
+        if len(title_side) == 1:
+            other = parts[1] if title_side[0] is parts[0] else parts[0]
+            o = _norm(other)
+            if o and not all(w in LABEL_WORDS for w in _words(other).split()) and not any(a and a in o for a in names):
+                return "other performer"
+    # "Artist & Someone - Title" / "Title - Artist X Someone": a guest the original doesn't have
+    for m in re.finditer(r"\s(?:&|and)\s+([^-()\[\]/|]+?)\s+[-\u2013\u2014]\s", folded):
+        guest = _norm(m.group(1))
+        if guest and not any(guest in a or a in guest for a in names if a) and not any(guest in v for v in title_variants(title)):
+            return "mashup"
+    # "Title - Artist X Someone" / "Artist × Someone": a mashup or collab the original doesn't have
+    for m in re.finditer(r"\s[x×]\s+(\S[^-()\[\]]*)", _fold(sc_title)):
+        guest = _norm(m.group(1))
+        if guest and not re.search(r"\s[x×]\s", _fold(title + " " + artist)) and not any(guest in a or a in guest for a in names if a):
+            return "mashup"
     return None
 
 
@@ -174,20 +318,25 @@ def judge(tr: dict, title: str, artist: str, duration: int) -> tuple[float | Non
         if diff > max(4.0, duration * 0.025):
             return None, f"length {sc_dur:.0f}s vs {duration}s"
     core = _core_title(title)
-    if not core or core not in _norm(sc_title):
+    sc_norm = _norm(sc_title)
+    variants = title_variants(title)
+    if not variants or not any(v in sc_norm for v in variants):
         return None, "title differs"
     other = _other_version(sc_title, title, artist)
     if other:
         return None, f"other version ({other})"
-    first_artist = _norm(re.split(r",|&| x | ft\.? | feat\.? ", artist or "", flags=re.I)[0])
-    artist_hit = bool(first_artist) and first_artist in _norm(sc_title + " " + user + " " + pub)
+    where = _norm(sc_title + " " + user + " " + pub)
+    names = artist_variants(artist)
+    artist_hit = any(a in where for a in names)
+    if not artist_hit and pub.strip():
+        return None, "artist differs"  # the upload declares another artist (e.g. a cover band)
     if not artist_hit and not (duration and abs(sc_dur - duration) <= 1.5):
         return None, "artist differs"
     score = 10.0 if artist_hit else 4.0
     if duration:
         score += 5.0 - abs(sc_dur - duration)
     score += math.log10((tr.get("playback_count") or 0) + 10)
-    if _norm(sc_title) == _norm(f"{artist}{title}") or _norm(sc_title) == core:
+    if sc_norm == _norm(f"{artist}{title}") or sc_norm == core or sc_norm in variants:
         score += 2
     return score, "ok"
 
