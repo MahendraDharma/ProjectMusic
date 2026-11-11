@@ -75,10 +75,11 @@ function isCurrent(track) {
 function warm(track) {
   if (server && track?.source === 'ytmusic') ytmusic.prepare(track);
 }
-/** Prepare the first songs of a page a moment after it opens (if the person stays). */
-function warmFirst(list, n = 2) {
+/** Prepare the first songs of a page a moment after it opens (if the person stays).
+    The server works on at most a few songs at once and says so when it is busy. */
+function warmFirst(list, n = 2, delay = 1200) {
   const route = location.hash;
-  setTimeout(() => { if (location.hash === route) list.slice(0, n).forEach(warm); }, 1200);
+  setTimeout(() => { if (location.hash === route) list.slice(0, n).forEach(warm); }, delay);
 }
 function intent(track) {
   let timer;
@@ -423,7 +424,10 @@ const pages = {
             data.tracks.length ? trackList(data.tracks, { onPlay: (i) => { recentSearches.add(query); player.playList(data.tracks, i); } })
               : emptyState(t('noResults', { q: query }), t('tryArtist')),
           ].filter(Boolean));
-          if (data.tracks.length) saveTimer = setTimeout(() => { recentSearches.add(query); data.tracks.slice(0, 2).forEach(warm); }, 1500);
+          // Get the top results ready as soon as they show (not on every keystroke: the
+          // hash changes with the query, so a newer search cancels this one).
+          warmFirst(data.tracks, 3, 400);
+          if (data.tracks.length) saveTimer = setTimeout(() => recentSearches.add(query), 1500);
         } else {
           const tracks = await audius.search(query, signal);
           results.replaceChildren(tracks.length ? trackList(tracks) : emptyState(t('noResults', { q: query }), t('tryArtist')));

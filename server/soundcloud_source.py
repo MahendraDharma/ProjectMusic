@@ -30,10 +30,23 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 CACHE_DIR = Path(__file__).resolve().parent / ".cache" / "sc"
 MAX_FILES = int(os.environ.get("PM_SC_CACHE_FILES", "400"))
 MISS_FOR = 6 * 3600          # lagu yang tidak ketemu: jangan dicari lagi selama 6 jam
+# Kata yang menandai versi LAIN dari lagu aslinya. Ditolak, kecuali judul aslinya
+# (dari YouTube Music) memang memuat kata itu.
 OTHER_VERSIONS = ("slowed", "sped up", "speed up", "speedup", "nightcore", "remix", "rmx", "bootleg",
-                  "cover", "karaoke", "instrumental", "reverb", "8d", "mashup", "lofi", "lo fi", "live",
-                  "acoustic", "akustik", "versi", "version", "mix", "dj ", "edit", "minus one", "tiktok")
-NOISE = re.compile(r"\((?:[^)]*)\)|\[(?:[^]]*)\]|\b(official|video|music|lyrics?|lirik|audio|mv|hd|hq)\b", re.I)
+                  "cover", "covered", "karaoke", "instrumental", "inst", "minus one", "reverb", "8d",
+                  "mashup", "lofi", "lo fi", "live", "acoustic", "akustik", "version", "versi", "mix",
+                  "dj", "edit", "tiktok", "koplo", "funkot", "jedag jedug", "amapiano", "jersey club")
+# Kata label yang hanya menjelaskan unggahan (bukan versi lain). Grup dalam kurung atau
+# bagian setelah " - " yang isinya HANYA kata-kata ini dibuang sebelum pengecekan,
+# jadi "(Official Lyric Video)", "[Lirik]", "- Official Audio" tidak ikut menolak.
+LABEL_WORDS = {
+    "official", "video", "videoclip", "clip", "klip", "music", "musik", "lyric", "lyrics", "lirik",
+    "audio", "visualizer", "visualiser", "mv", "m", "v", "hd", "hq", "4k", "full", "song", "lagu",
+    "explicit", "clean", "single", "album", "original", "versi", "version", "ver", "radio", "new",
+    "terbaru", "resmi", "with", "dengan", "teks", "text", "of", "the", "and", "dan", "ost",
+}
+NOISE = re.compile(r"\((?:[^)]*)\)|\[(?:[^]]*)\]|\b(official|video|music|lyrics?|lirik|audio|mv|hd|hq|visualizer)\b", re.I)
+_GROUP = re.compile(r"\(([^)]*)\)|\[([^]]*)\]|【([^】]*)】")
 
 _lock = threading.Lock()
 _inflight: dict = {}
@@ -124,52 +137,110 @@ def _playable(tr: dict):
     return best[1] if best else None
 
 
-def _score(tr: dict, title: str, artist: str, duration: int) -> float | None:
+def _strip_labels(text: str, keep: str = "") -> str:
+    """Drop bracket groups and " - " parts made only of label words (and of words that
+    are already in `keep`, i.e. the artist/title), so they can't count as another version."""
+    keep_words = set(_words(keep).split())
+
+    def label_only(part: str) -> bool:
+        ws = _words(part).split()
+        return bool(ws) and all(w in LABEL_WORDS or w in keep_words for w in ws)
+
+    text = _GROUP.sub(lambda m: " " if label_only(next(g for g in m.groups() if g is not None)) else m.group(0), text or "")
+    parts = re.split(r"\s+[-\u2013\u2014|]\s+", text)
+    return " ".join(p for i, p in enumerate(parts) if i == 0 or not label_only(p))
+
+
+def _other_version(sc_title: str, title: str, artist: str) -> str | None:
+    """The word that makes this upload another version (remix, cover, ...), or None."""
+    yt_words = _words(title + " " + artist)
+    sc_words = _words(_strip_labels(sc_title, keep=title + " " + artist))
+    for w in OTHER_VERSIONS:
+        if (" " + w + " ") in sc_words and (" " + w + " ") not in yt_words:
+            return w
+    return None
+
+
+def judge(tr: dict, title: str, artist: str, duration: int) -> tuple[float | None, str]:
+    """(score, reason): score is None when this upload is not the same recording."""
     sc_title = tr.get("title") or ""
     user = ((tr.get("user") or {}).get("username") or "")
     pub = ((tr.get("publisher_metadata") or {}).get("artist") or "")
     sc_dur = (tr.get("full_duration") or tr.get("duration") or 0) / 1000
     if sc_dur < 45:
-        return None
+        return None, "too short"
     if duration:
         diff = abs(sc_dur - duration)
         if diff > max(4.0, duration * 0.025):
-            return None
+            return None, f"length {sc_dur:.0f}s vs {duration}s"
     core = _core_title(title)
     if not core or core not in _norm(sc_title):
-        return None
-    yt_words, sc_words = _words(title + " " + artist), _words(sc_title)
-    for w in OTHER_VERSIONS:
-        if (" " + w.strip() + " ") in sc_words and (" " + w.strip() + " ") not in yt_words:
-            return None
+        return None, "title differs"
+    other = _other_version(sc_title, title, artist)
+    if other:
+        return None, f"other version ({other})"
     first_artist = _norm(re.split(r",|&| x | ft\.? | feat\.? ", artist or "", flags=re.I)[0])
     artist_hit = bool(first_artist) and first_artist in _norm(sc_title + " " + user + " " + pub)
     if not artist_hit and not (duration and abs(sc_dur - duration) <= 1.5):
-        return None
+        return None, "artist differs"
     score = 10.0 if artist_hit else 4.0
     if duration:
         score += 5.0 - abs(sc_dur - duration)
     score += math.log10((tr.get("playback_count") or 0) + 10)
     if _norm(sc_title) == _norm(f"{artist}{title}") or _norm(sc_title) == core:
         score += 2
-    return score
+    return score, "ok"
+
+
+def _score(tr: dict, title: str, artist: str, duration: int) -> float | None:
+    return judge(tr, title, artist, duration)[0]
+
+
+def pick(candidates: list, title: str, artist: str, duration: int) -> tuple[dict | None, str]:
+    """Best playable match among search results, plus a short reason when there is none."""
+    best, reasons, preview_only = None, {}, False
+    for tr in candidates:
+        s, why = judge(tr, title, artist, duration)
+        if s is None:
+            reasons[why.split(" (")[0].split(" ")[0]] = reasons.get(why.split(" (")[0].split(" ")[0], 0) + 1
+            continue
+        if not _playable(tr):
+            preview_only = True  # the same recording exists, but only as a preview / DRM
+            continue
+        if not best or s > best[0]:
+            best = (s, tr)
+    if best:
+        return best[1], "ok"
+    why = ", ".join(f"{k} {v}x" for k, v in sorted(reasons.items(), key=lambda kv: -kv[1]))
+    return None, ("match is preview/DRM only; " if preview_only else "") + (why or "no results")
 
 
 def find(title: str, artist: str, duration: int) -> dict | None:
     first_artist = re.split(r",|&| x | ft\.? | feat\.? ", artist or "", flags=re.I)[0].strip()
     q = f"{first_artist} {NOISE.sub(' ', title)}".strip()
     res = _api("/search/tracks", {"q": q, "limit": 20, "linked_partitioning": 1})
-    best = None
-    for tr in res.get("collection") or []:
-        if not _playable(tr):
-            continue
-        s = _score(tr, title, artist, duration)
-        if s is not None and (not best or s > best[0]):
-            best = (s, tr)
-    return best[1] if best else None
+    tr, why = pick(res.get("collection") or [], title, artist, duration)
+    if not tr:
+        _log(f"soundcloud: no match for '{artist} - {title}': {why}")
+    return tr
 
 
 # --------------------------------------------------------------------------- audio
+SEG_WORKERS = int(os.environ.get("PM_SC_WORKERS", "16"))      # parallel segments per song
+_seg_slots = threading.BoundedSemaphore(int(os.environ.get("PM_SC_MAX_PARALLEL", "32")))  # all songs together
+
+
+def _segment(url: str) -> bytes:
+    with _seg_slots:
+        for attempt in (0, 1):
+            try:
+                return _get(url, 15, raw=True)
+            except (urllib.error.URLError, OSError):
+                if attempt:
+                    raise
+    raise RuntimeError("unreachable")
+
+
 def _download(tr: dict, dest: Path):
     tc = _playable(tr)
     params = {}
@@ -182,8 +253,8 @@ def _download(tr: dict, dest: Path):
     urls = ([init.group(1)] if init else []) + [urllib.parse.urljoin(m3u8, s) for s in segs]
     if not urls:
         raise RuntimeError("empty SoundCloud playlist")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        parts = list(pool.map(lambda u: _get(u, 15, raw=True), urls))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(SEG_WORKERS, len(urls)))) as pool:
+        parts = list(pool.map(_segment, urls))
     tmp = dest.with_suffix(".part")
     with open(tmp, "wb") as f:
         for p in parts:
@@ -233,7 +304,7 @@ def audio_file(vid: str, title: str, artist: str, duration: int) -> Path | None:
         tr = find(title, artist, duration)
         if not tr:
             _miss[vid] = time.time() + MISS_FOR
-            _log(f"soundcloud {vid}: no good match for '{artist} - {title}' ({time.time() - t0:.1f} s)")
+            _log(f"soundcloud {vid}: no good match ({time.time() - t0:.1f} s), using YouTube")
             return None
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         dest = CACHE_DIR / f"{vid}.m4a"

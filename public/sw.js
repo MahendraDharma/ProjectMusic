@@ -1,6 +1,6 @@
 // Service worker: menyimpan "cangkang" aplikasi (HTML/CSS/JS) agar terbuka cepat & bisa
 // di-install. Request ke API/audio (domain lain) tidak disentuh — selalu langsung ke jaringan.
-const VERSION = 'pm-v18';
+const VERSION = 'pm-v19';
 const SHELL = [
   './',
   'index.html',
