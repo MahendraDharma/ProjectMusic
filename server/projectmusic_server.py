@@ -1207,7 +1207,9 @@ class Upstream:
     def _request(self, first: int, last: int):
         headers = dict(self.info["headers"])
         headers["Range"] = f"bytes={first}-{last}"
-        for attempt in range(3):
+        redirects = 0
+        attempt = 0
+        while attempt < 3:
             try:
                 conn = self._connect()
                 self.clean = False
@@ -1215,8 +1217,23 @@ class Upstream:
                 resp = conn.getresponse()
             except (http.client.HTTPException, OSError):
                 self.close()  # stale keep-alive connection: reconnect
-                if attempt == 2:
+                attempt += 1
+                if attempt == 3:
                     raise
+                continue
+            if resp.status in (301, 302, 303, 307, 308) and redirects < 5:
+                # The audio host may send us to another server: follow it.
+                loc = resp.getheader("Location") or ""
+                resp.read()
+                self.clean = True
+                if not loc:
+                    raise RuntimeError(f"audio host answered {resp.status} without Location")
+                u = urllib.parse.urlsplit(urllib.parse.urljoin(f"{'https' if self.https else 'http'}://{self.host}{self.path}", loc))
+                self.close()
+                self.https = u.scheme == "https"
+                self.host = u.netloc
+                self.path = u.path + ("?" + u.query if u.query else "")
+                redirects += 1
                 continue
             if resp.status in (403, 410):
                 resp.read()
