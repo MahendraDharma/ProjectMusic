@@ -1,0 +1,24 @@
+services:
+  projectmusic:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: projectmusic:local
+    container_name: projectmusic
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PM_COUNTRY: ID
+      # Alamat lain yang boleh memakai server ini dari browser, pisahkan dengan koma
+      # PM_ALLOWED_ORIGINS: https://contoh.ts.net
+    volumes:
+      - pm_cache:/app/server/.cache
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 768M
+
+volumes:
+  pm_cache:
