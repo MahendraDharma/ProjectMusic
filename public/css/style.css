@@ -118,7 +118,7 @@ h1, h2, h3, p { margin: 0; }
 .row-text small { color: var(--ink2); font-size: 13px; font-variant-numeric: tabular-nums; }
 .row.playing .row-text b { color: var(--accent); }
 
-.cards { display: flex; gap: 12px; overflow-x: auto; margin: 0 -20px; padding: 0 20px 6px; scroll-snap-type: x proximity; scrollbar-width: none; }
+.cards { display: flex; gap: 12px; overflow-x: auto; margin: 0 -20px; padding: 0 20px 6px; scroll-snap-type: x proximity; scrollbar-width: none; scroll-padding-inline: 20px; }
 .cards::-webkit-scrollbar { display: none; }
 .card { flex: none; width: 140px; text-align: left; scroll-snap-align: start; }
 .card-art { width: 140px; height: 140px; border-radius: 8px; object-fit: cover; background: var(--raised); margin-bottom: 8px; }
@@ -150,8 +150,41 @@ h1, h2, h3, p { margin: 0; }
 .recent-main { flex: 1; display: flex; align-items: center; gap: 12px; height: 48px; text-align: left; color: var(--ink); }
 .recent-main .ic { color: var(--ink3); }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.tile { height: 92px; border-radius: 10px; padding: 12px; display: flex; align-items: flex-end; text-align: left; font-weight: 500; font-size: 15px; }
+.tile { position: relative; overflow: hidden; height: 96px; border-radius: 14px; padding: 12px 14px; display: flex; align-items: flex-start; text-align: left; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; color: #fff; isolation: isolate;
+  background: radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--tile) 55%, #fff 0%) 0%, transparent 60%), linear-gradient(135deg, color-mix(in srgb, var(--tile) 100%, #fff 14%), var(--tile)); }
 .tile:hover { filter: brightness(1.12); }
+.tile-label { position: relative; z-index: 1; max-width: 70%; line-height: 1.2; }
+.tile-art { position: absolute; right: -8px; bottom: -14px; width: 78px; height: 78px; transform: rotate(16deg); filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .35)); transition: transform .3s var(--ease); pointer-events: none; }
+.tile:hover .tile-art { transform: rotate(8deg) scale(1.06); }
+
+/* ---------------------------------------------------------------- home charts & playlists */
+.liked-art { display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent), #7B2FF7); }
+.chart { margin-top: 28px; }
+.chart-hero { position: relative; overflow: hidden; isolation: isolate; border-radius: 22px; padding: 18px 18px 16px; min-height: 196px; display: flex; flex-direction: column; color: #fff;
+  background: radial-gradient(110% 90% at 0% 0%, var(--c1) 0%, transparent 58%), radial-gradient(90% 100% at 100% 100%, var(--c3) 0%, transparent 62%), var(--c2); }
+.chart-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; opacity: .22; mix-blend-mode: overlay; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.chart-kicker { position: relative; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; opacity: .92; max-width: 58%; }
+.chart-big { position: relative; display: block; margin-top: 6px; font-family: "Plus Jakarta Sans", "DM Sans", system-ui, sans-serif; font-weight: 800; font-size: 54px; line-height: .86; letter-spacing: -0.045em; text-shadow: 0 2px 24px rgba(0, 0, 0, .2); }
+.chart-stickers { position: absolute; right: 12px; top: 14px; width: 132px; height: 128px; }
+.chart-sticker { position: absolute; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255, 255, 255, .92); box-shadow: 0 8px 20px rgba(0, 0, 0, .35); background: var(--raised); }
+.chart-sticker:nth-child(1) { right: 0; top: 0; width: 78px; height: 78px; transform: rotate(8deg); }
+.chart-sticker:nth-child(2) { left: 0; top: 34px; transform: rotate(-10deg); }
+.chart-sticker:nth-child(3) { right: 24px; bottom: 0; width: 54px; height: 54px; transform: rotate(4deg); }
+.chart-img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.38); }
+.chart-foot { position: relative; display: flex; align-items: center; gap: 14px; margin-top: auto; padding-top: 16px; }
+.chart-play { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px 0 12px; border-radius: 999px; background: #fff; color: #111; font-weight: 700; font-size: 14px; }
+.chart-link { color: #fff; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; opacity: .92; }
+.chart-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.chart-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 62px; text-align: left; border-radius: 12px; }
+.chart-row:hover { background: var(--card); }
+.chart-rank { width: 30px; flex: none; text-align: center; font-family: "Plus Jakarta Sans", "DM Sans", system-ui, sans-serif; font-weight: 800; font-size: 26px; line-height: 1; color: transparent; -webkit-text-stroke: 1.3px var(--ink2); }
+.chart-list li:first-child .chart-rank { color: var(--accent); -webkit-text-stroke: 0; }
+.chart-thumb { width: 48px; height: 48px; border-radius: 10px; overflow: hidden; flex: none; background: var(--raised); }
+.chart-row .row-text { min-width: 0; }
+.chart-row .row-text b, .chart-row .row-text small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.chart-row .row-text b { font-weight: 500; font-size: 15px; }
+.chart-row .row-text small { color: var(--ink2); font-size: 13px; }
 
 /* ---------------------------------------------------------------- library & settings */
 .lib-row { display: flex; align-items: center; gap: 14px; min-height: 72px; }
@@ -353,6 +386,13 @@ body.dragging .drop { display: grid; }
 
 /* ================================================================ DESKTOP */
 @media (min-width: 1024px) {
+  .chart { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 22px; align-items: start; }
+  .chart-hero { min-height: 312px; padding: 22px; }
+  .chart-big { font-size: 88px; }
+  .chart-stickers { transform: scale(1.25); transform-origin: top right; }
+  .chart-list { margin: 0; }
+  .tile { height: 112px; }
+  .tile-art { width: 92px; height: 92px; }
   .only-mobile { display: none !important; }
   .tabbar, .mini { display: none !important; }
   .app {

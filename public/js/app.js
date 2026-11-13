@@ -76,9 +76,9 @@ function warm(track) {
   if (server && track?.source === 'ytmusic') ytmusic.prepare(track);
 }
 /** Prepare the first songs of a page a moment after it opens (if the person stays). */
-function warmFirst(list, n = 2) {
+function warmFirst(list, n = 2, delay = 1200) {
   const route = location.hash;
-  setTimeout(() => { if (location.hash === route) list.slice(0, n).forEach(warm); }, 1200);
+  setTimeout(() => { if (location.hash === route) list.slice(0, n).forEach(warm); }, delay);
 }
 function intent(track) {
   let timer;
@@ -126,6 +126,74 @@ function artistCard(a) {
 
 function artistRow(list) {
   return h('div', { class: 'cards artists' }, list.map(artistCard));
+}
+
+/* ---------- Home: your playlists ---------- */
+function playlistCard(pl) {
+  return h('a', { class: 'card', href: '#/mine?id=' + encodeURIComponent(pl.id) },
+    playlistArt(pl, 'card-art'), h('b', {}, pl.name), h('small', {}, t('songs', { n: pl.tracks.length })));
+}
+
+function myPlaylistsSection() {
+  const mine = playlists.all();
+  const liked = favs.all();
+  if (!mine.length && !liked.length) return null;
+  const likedCard = liked.length
+    ? h('a', { class: 'card', href: '#/library?f=liked' }, h('span', { class: 'card-art liked-art' }, icon('heartFill', 44)),
+      h('b', {}, t('likedSongs')), h('small', {}, t('songs', { n: liked.length })))
+    : null;
+  return h('section', {}, sectionHead(t('yourPlaylists'), h('a', { class: 'link-btn', href: '#/library' }, t('seeAll'))),
+    h('div', { class: 'cards' }, likedCard, mine.slice(0, 12).map(playlistCard)));
+}
+
+/* ---------- Home: charts ----------
+   YouTube's chart songs only come with music-video thumbnails (black bars, clickbait
+   text), so a chart is drawn as a bold gradient card + a ranked list where each
+   thumbnail is cropped to its centre. */
+const CHART_THEMES = [
+  ['#FF3D77', '#7B2FF7', '#00D4FF'],
+  ['#FF8A00', '#FF2E63', '#6A00F4'],
+  ['#00F5A0', '#00B3FF', '#5B2BFF'],
+];
+
+function chartSection(sec, i) {
+  const list = sec.tracks;
+  const [c1, c2, c3] = CHART_THEMES[i % CHART_THEMES.length];
+  const n = /\d+/.exec(sec.title)?.[0] || String(Math.min(list.length, 100));
+  const kicker = sec.title.replace(/\d+/, ' ').replace(/\s+/g, ' ').trim();
+  const href = '#/playlist?id=' + encodeURIComponent(sec.playlistId);
+  const stickers = h('span', { class: 'chart-stickers', 'aria-hidden': 'true' },
+    list.slice(0, 3).map((tr) => h('span', { class: 'chart-sticker' }, artEl(tr, 'chart-img'))));
+  const hero = h('div', { class: 'chart-hero', style: `--c1:${c1};--c2:${c2};--c3:${c3}` },
+    stickers,
+    h('span', { class: 'chart-kicker' }, kicker),
+    h('strong', { class: 'chart-big' }, 'TOP', h('br'), n),
+    h('span', { class: 'chart-foot' },
+      h('button', { class: 'chart-play', onclick: () => player.playList(list, 0) }, icon('play', 16), t('play')),
+      h('a', { class: 'chart-link', href }, t('seeAll'))));
+  const rows = h('ol', { class: 'chart-list' }, list.slice(0, 5).map((tr, k) => h('li', {},
+    h('button', { class: 'chart-row', onclick: () => player.playList(list, k), ...intent(tr) },
+      h('span', { class: 'chart-rank' }, String(k + 1)),
+      h('span', { class: 'chart-thumb' }, artEl(tr, 'chart-img')),
+      h('span', { class: 'row-text' }, h('b', {}, tr.title), h('small', {}, tr.artist))))));
+  return h('section', { class: 'chart', 'aria-label': sec.title }, hero, rows);
+}
+
+/* ---------- Search: browse tiles ----------
+   Small flat illustrations (fixed strings written here, no outside data). */
+const TILE_ART = {
+  pop: '<rect x="36" y="8" width="28" height="46" rx="14" fill="#fff"/><path d="M42 20h16M42 28h16M42 36h16" stroke="#000" stroke-opacity=".18" stroke-width="3" stroke-linecap="round"/><path d="M27 42a23 23 0 0 0 46 0" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M50 66v16M38 86h24" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M84 10l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#FFD84D"/><path d="M14 58l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#FFD84D"/>',
+  dangdut: '<path d="M22 30c-5 15-5 32 0 46 9 7 47 7 56 0 5-14 5-31 0-46z" fill="#fff"/><path d="M27 38l11.5 30L50 38l11.5 30L73 38" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="3" stroke-linejoin="round"/><ellipse cx="50" cy="30" rx="28" ry="9" fill="#FFD84D"/><circle cx="84" cy="18" r="5" fill="#fff"/><path d="M88.5 18V3l8-2" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>',
+  galau: '<path d="M28 54h44a14 14 0 0 0 1-28 21 21 0 0 0-40-3 13 13 0 0 0-5 31z" fill="#fff"/><path d="M50 47l-9-9a5.6 5.6 0 0 1 9-6.5 5.6 5.6 0 0 1 9 6.5z" fill="#FF6B8B"/><path d="M50 31.5l-3 6 5 3-3 6.5" fill="none" stroke="#fff" stroke-width="2"/><path d="M34 64l-4 11M50 64l-4 11M66 64l-4 11" stroke="#9EC9FF" stroke-width="5" stroke-linecap="round"/>',
+  chill: '<g transform="translate(4 6) rotate(-38 50 50) scale(.86)"><rect x="45" y="4" width="10" height="46" rx="2" fill="#FFD84D"/><rect x="41" y="-6" width="18" height="13" rx="4" fill="#fff"/><path d="M50 44c-14 0-22 8-22 18 0 6 4 9 4 12-6 3-8 8-8 13 0 10 12 15 26 15s26-5 26-15c0-5-2-10-8-13 0-3 4-6 4-12 0-10-8-18-22-18z" fill="#fff"/><circle cx="50" cy="72" r="8" fill="#000" fill-opacity=".25"/><path d="M47 6v92M53 6v92" stroke="#000" stroke-opacity=".2" stroke-width="1.4"/><rect x="40" y="90" width="20" height="4" rx="2" fill="#000" fill-opacity=".25"/></g>',
+  indie: '<rect x="8" y="22" width="84" height="56" rx="8" fill="#fff"/><rect x="18" y="30" width="64" height="24" rx="4" fill="#FFD84D"/><circle cx="35" cy="42" r="7.5" fill="#fff"/><circle cx="65" cy="42" r="7.5" fill="#fff"/><circle cx="35" cy="42" r="3" fill="#000" fill-opacity=".3"/><circle cx="65" cy="42" r="3" fill="#000" fill-opacity=".3"/><path d="M26 78l7-13h34l7 13" fill="#000" fill-opacity=".15"/>',
+  vinyl: '<circle cx="50" cy="50" r="42" fill="#111"/><circle cx="50" cy="50" r="33" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="2"/><circle cx="50" cy="50" r="25" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="2"/><circle cx="50" cy="50" r="14" fill="#FF6B8B"/><circle cx="50" cy="50" r="3" fill="#111"/><path d="M26 30a32 32 0 0 1 15-9" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3" stroke-linecap="round"/>',
+};
+
+function tileArt(kind) {
+  const el = h('span', { class: 'tile-art', 'aria-hidden': 'true' });
+  el.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%">${TILE_ART[kind] || ''}</svg>`;
+  return el;
 }
 
 /* =====================================================================
@@ -242,7 +310,7 @@ const pages = {
     const chartBox = h('div', {}, sectionHead(t('trendingWeek')), skeletonCards(4), skeletonRows(3));
     const radioBox = h('div', {});
 
-    show(homeHead(greeting(), true), recent.length ? quickGrid(recent.slice(0, 6)) : null, madeBox, chartBox, radioBox);
+    show(homeHead(greeting(), true), recent.length ? quickGrid(recent.slice(0, 6)) : null, myPlaylistsSection(), madeBox, chartBox, radioBox);
     warmFirst(recent, 2); // the songs played last are the likeliest to be played again
 
     // Made for you + your top artists, from the on-device taste model
@@ -268,8 +336,7 @@ const pages = {
       const data = await ytmusic.home(signal);
       const nodes = [];
       data.sections.forEach((sec, i) => {
-        nodes.push(h('section', {}, sectionHead(sec.title, h('a', { class: 'link-btn', href: '#/playlist?id=' + encodeURIComponent(sec.playlistId) }, t('seeAll'))),
-          cardRow(sec.tracks.slice(0, 20))));
+        nodes.push(chartSection(sec, i));
         if (i === 0 && data.artists?.length) nodes.push(h('section', {}, sectionHead(t('popularArtists')), artistRow(data.artists.slice(0, 12))));
       });
       chartBox.replaceChildren(...nodes);
@@ -325,8 +392,8 @@ const pages = {
 
     const browse = () => {
       const tiles = [
-        ['browsePop', 'pop indonesia', '#4a2b34'], ['browseDangdut', 'dangdut koplo', '#4a3a22'], ['browseGalau', 'lagu galau', '#24324a'],
-        ['browseChill', 'santai akustik', '#22423a'], ['browseIndie', 'indie indonesia', '#3a2a4a'], ['browseAudius', null, '#34363b'],
+        ['browsePop', 'pop indonesia', '#4a2b34', 'pop'], ['browseDangdut', 'dangdut koplo', '#4a3a22', 'dangdut'], ['browseGalau', 'lagu galau', '#24324a', 'galau'],
+        ['browseChill', 'santai akustik', '#22423a', 'chill'], ['browseIndie', 'indie indonesia', '#3a2a4a', 'indie'], ['browseAudius', null, '#34363b', 'vinyl'],
       ];
       const recentList = recentSearches.all();
       return [
@@ -335,9 +402,9 @@ const pages = {
           h('button', { class: 'recent-main', onclick: () => { input.value = r; run(r); } }, icon('clock', 20), h('span', {}, r)),
           h('button', { class: 'icon-btn', 'aria-label': t('remove'), onclick: () => { recentSearches.remove(r); results.replaceChildren(...browse().filter(Boolean)); } }, icon('close', 18)))),
         h('h3', { class: 'label' }, t('browse')),
-        h('div', { class: 'tiles' }, tiles.map(([key, query, bg]) => query
-          ? h('button', { class: 'tile', style: { background: bg }, onclick: () => { input.value = t(key); run(query); } }, t(key))
-          : h('a', { class: 'tile', style: { background: bg }, href: '#/indie' }, t(key)))),
+        h('div', { class: 'tiles' }, tiles.map(([key, query, bg, art]) => query
+          ? h('button', { class: 'tile', style: `--tile:${bg}`, onclick: () => { input.value = t(key); run(query); } }, h('span', { class: 'tile-label' }, t(key)), tileArt(art))
+          : h('a', { class: 'tile', style: `--tile:${bg}`, href: '#/indie' }, h('span', { class: 'tile-label' }, t(key)), tileArt(art)))),
       ];
     };
 
@@ -356,7 +423,10 @@ const pages = {
             data.tracks.length ? trackList(data.tracks, { onPlay: (i) => { recentSearches.add(query); player.playList(data.tracks, i); } })
               : emptyState(t('noResults', { q: query }), t('tryArtist')),
           ].filter(Boolean));
-          if (data.tracks.length) saveTimer = setTimeout(() => { recentSearches.add(query); data.tracks.slice(0, 2).forEach(warm); }, 1500);
+          // Get the top results ready as soon as they show (not on every keystroke: the
+          // hash changes with the query, so a newer search cancels this one).
+          warmFirst(data.tracks, 3, 400);
+          if (data.tracks.length) saveTimer = setTimeout(() => recentSearches.add(query), 1500);
         } else {
           const tracks = await audius.search(query, signal);
           results.replaceChildren(tracks.length ? trackList(tracks) : emptyState(t('noResults', { q: query }), t('tryArtist')));
