@@ -7,3 +7,4 @@ server/server.log
 public/download/
 server/.cache/
 build.json
+server/tests/reliability-*.csv

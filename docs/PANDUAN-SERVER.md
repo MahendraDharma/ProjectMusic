@@ -129,6 +129,8 @@ Kalau server mati, link itu kembali ke musik indie Audius.
 | Lagu tidak bisa diputar, padahal daftar lagu muncul | Tutup server lalu jalankan lagi skrip start: skrip otomatis memperbarui `yt-dlp`, yang biasanya memperbaikinya. |
 | Muncul pesan "not a bot" | Server berjalan di jaringan yang diblokir YouTube (misalnya VPN atau hosting). Jalankan di Wi-Fi rumah atau data seluler biasa. |
 | "not a bot" tetap muncul di rumah | Ekspor `cookies.txt` dari akun YouTube **cadangan** (format Netscape, misalnya dengan ekstensi browser "Get cookies.txt LOCALLY"), lalu jalankan server dengan `PM_COOKIES=/lokasi/cookies.txt`. `/api/health` akan menampilkan `"cookies": true`. YouTube bisa membatasi akun yang dipakai, jadi jangan pakai akun utama. |
+| Lagu lama mulai, atau banyak yang gagal | Buka `/api/health`: `jsRuntime` harus berisi **deno** atau **node**. Kalau `false`, pasang [Deno](https://deno.land) 2.3+ (disarankan) atau Node.js 22+, lalu jalankan ulang server. Image Docker sudah berisi Deno. |
+| Lagu berikutnya tidak lagi disiapkan duluan | Tanpa akun, YouTube mengizinkan sekitar 300 lagu per jam. Mendekati batas itu, server hanya mencari lagu saat diputar (`lookupsLastHour` di `/api/health`). Dengan `PM_COOKIES` batasnya lebih tinggi; `PM_YT_BUDGET` untuk mengaturnya sendiri. |
 | Beberapa lagu gagal | Sebagian lagu dibatasi wilayah atau umur oleh YouTube; lewati saja. |
 | Ingin tangga lagu negara lain | Jalankan dengan variabel `PM_COUNTRY`, misalnya `PM_COUNTRY=US sh start.sh`. |
 | Port 8080 sudah dipakai | `sh start.sh --port 9090`, lalu buka `http://localhost:9090`. |

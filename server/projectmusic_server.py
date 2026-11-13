@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - pesan ramah untuk pengguna
         "atau: pip install -r requirements.txt"
     )
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 COUNTRY = os.environ.get("PM_COUNTRY", "ID")  # kode negara untuk tangga lagu
@@ -484,6 +484,8 @@ def api_prepare(q):
     if _blocked.get(vid, 0) > time.time():
         return {"ok": True, "queued": False, "blocked": True}
     hit = cache.get("audio:" + vid) if VIDEO_ID.match(vid) else True
+    if not hit and lookups_last_hour() >= lookup_budget() * 0.8:
+        return {"ok": True, "queued": False, "budget": True}  # near YouTube's limit: play-time lookups only
     if not hit or (isinstance(hit, dict) and not (hit.get("size") and hit.get("checked"))):
         if not _prepare_slots.acquire(blocking=False):
             return {"ok": True, "queued": False}  # busy: the app may ask again later
@@ -823,7 +825,9 @@ def api_health(_q):
         "build": _build().get("commit", ""),
         "country": COUNTRY,
         "ytdlp": yt_dlp.version.__version__,
-        "jsRuntime": bool(shutil.which("deno") or shutil.which("node") or shutil.which("bun")),
+        "jsRuntime": ", ".join(JS_RUNTIMES) or False,
+        "lookupsLastHour": lookups_last_hour(),
+        "lookupBudget": lookup_budget(),
         "cookies": COOKIE_FILE is not None,
     }
 
@@ -892,8 +896,46 @@ def resolve_audio(vid: str, fresh: bool = False, full: bool = False) -> dict:
 # Fast path: one YouTube client that needs no JavaScript solving, and no extra page /
 # manifest downloads. If it doesn't give a usable audio link, the normal (slower,
 # complete) yt-dlp setup is used. After 3 misses in a row the fast path rests 30 min.
-FAST_ARGS = {"youtube": {"player_client": ["visionos"], "player_skip": ["webpage", "configs"], "skip": ["dash", "hls", "translated_subs"]}}
+# Both paths skip the "next" request (related videos / initial data): we never read it,
+# and it is the slowest request in the chain (BitChord measured it at up to 7 s, or hanging).
+FAST_ARGS = {"youtube": {"player_client": ["visionos"], "player_skip": ["webpage", "configs", "initial_data"],
+                         "skip": ["dash", "hls", "translated_subs"]}}
+# The full path also skips the HLS/DASH manifests (we only use the direct audio
+# formats); if that ever leaves no audio, SAFE_ARGS asks again with the manifests.
+FULL_ARGS = {"youtube": {"player_skip": ["initial_data"], "skip": ["dash", "hls", "translated_subs"]}}
+SAFE_ARGS = {"youtube": {"player_skip": ["initial_data"], "skip": ["translated_subs"]}}
 _fast = {"misses": 0, "off_until": 0.0}
+
+
+def _version(cmd: list) -> tuple:
+    import subprocess
+
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ()
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", out or "")
+    return tuple(int(x) for x in m.groups()) if m else ()
+
+
+def _find_js_runtimes() -> dict:
+    """JavaScript runtimes yt-dlp can use for YouTube's challenges. yt-dlp only looks
+    for Deno on its own, so Node/Bun must be named explicitly or they are never used,
+    which leaves only the clients that need no JavaScript (fewer formats, more failures)."""
+    found = {}
+    deno = shutil.which("deno")
+    if deno and _version([deno, "--version"]) >= (2, 3, 0):
+        found["deno"] = {"path": deno}
+    node = shutil.which("node")
+    if node and _version([node, "--version"]) >= (22, 0, 0):
+        found["node"] = {"path": node}
+    bun = shutil.which("bun")
+    if bun and (1, 2, 11) <= _version([bun, "--version"]) <= (1, 3, 14):
+        found["bun"] = {"path": bun}
+    return found
+
+
+JS_RUNTIMES = _find_js_runtimes()
 
 
 def _log(msg: str):
@@ -928,14 +970,104 @@ def _prepare_cookies():
     _log("cookies: using the YouTube cookies from PM_COOKIES")
 
 
+class _YdlPool:
+    """A few long-lived yt-dlp instances per setting. A new instance per song throws away
+    yt-dlp's in-memory copy of YouTube's player JavaScript (several MB) and its solved
+    challenges, so every song downloaded and parsed them again."""
+
+    SIZE = 3
+
+    def __init__(self, extractor_args: dict):
+        import queue
+
+        self.args = extractor_args
+        self.free = queue.LifoQueue()
+        self.made = 0
+        self.lock = threading.Lock()
+
+    def _new(self):
+        opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True,
+                "skip_download": True, "extractor_args": self.args}
+        if JS_RUNTIMES:
+            opts["js_runtimes"] = JS_RUNTIMES
+        if COOKIE_FILE:
+            opts["cookiefile"] = str(COOKIE_FILE)
+        return yt_dlp.YoutubeDL(opts)
+
+    def extract(self, vid: str) -> dict:
+        import queue
+
+        ydl = None
+        try:
+            ydl = self.free.get_nowait()
+        except queue.Empty:
+            with self.lock:
+                if self.made < self.SIZE:
+                    self.made += 1
+                    ydl = self._new()
+            if ydl is None:
+                ydl = self.free.get(timeout=90)
+        try:
+            return ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
+        finally:
+            if COOKIE_FILE:
+                try:
+                    ydl.save_cookies()  # yt-dlp refreshes the session cookies; keep them
+                except Exception:
+                    pass
+            self.free.put(ydl)
+
+
+_pools = {"fast": _YdlPool(FAST_ARGS), "full": _YdlPool(FULL_ARGS), "safe": _YdlPool(SAFE_ARGS)}
+
+# Lookups to YouTube in the last hour. YouTube allows roughly 300 videos/hour without an
+# account and ~2000 with one (yt-dlp wiki); getting songs ready in advance stops well
+# before that, so actual playback never runs into the limit.
+_lookups: list = []
+_lookups_lock = threading.Lock()
+
+
+def _note_lookup():
+    now = time.time()
+    with _lookups_lock:
+        _lookups.append(now)
+        while _lookups and _lookups[0] < now - 3600:
+            _lookups.pop(0)
+
+
+def lookups_last_hour() -> int:
+    now = time.time()
+    with _lookups_lock:
+        while _lookups and _lookups[0] < now - 3600:
+            _lookups.pop(0)
+        return len(_lookups)
+
+
+def lookup_budget() -> int:
+    env = os.environ.get("PM_YT_BUDGET", "").strip()
+    if env.isdigit():
+        return int(env)
+    return 1500 if COOKIE_FILE else 240
+
+
 def _extract(vid: str, extractor_args: dict | None):
-    opts = {"format": AUDIO_FORMAT, "quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
-    if extractor_args:
-        opts["extractor_args"] = extractor_args
-    if COOKIE_FILE:
-        opts["cookiefile"] = str(COOKIE_FILE)
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        return ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
+    _note_lookup()
+    name = {id(FAST_ARGS): "fast", id(FULL_ARGS): "full", id(SAFE_ARGS): "safe"}.get(id(extractor_args), "full")
+    return _pools[name].extract(vid)
+
+
+def warm_up():
+    """Pay yt-dlp's cold costs (player JavaScript, challenge solver) right after start,
+    instead of on the first song someone picks."""
+    vid = os.environ.get("PM_WARMUP_ID", "").strip()
+    if not vid:
+        vid = next(iter(sorted(_disk, key=lambda k: -_disk[k][1])), "") or "dQw4w9WgXcQ"
+    t0 = time.time()
+    try:
+        _extract(vid, FULL_ARGS)
+        _log(f"warm-up done in {time.time() - t0:.1f} s (JavaScript runtime: {', '.join(JS_RUNTIMES) or 'none'})")
+    except Exception as e:
+        _log(f"warm-up skipped: {e.__class__.__name__}")
 
 
 def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
@@ -955,7 +1087,14 @@ def _resolve_audio(vid: str, key: str, full: bool = False) -> dict:
                 _fast.update(misses=0, off_until=time.time() + 1800)
                 _log("audio: fast lookup not working right now, using the full one for 30 min")
     if info is None:
-        info = _extract(vid, None)
+        try:
+            info = _extract(vid, FULL_ARGS)
+            if not (info.get("url") or info.get("requested_formats")):
+                raise RuntimeError("no audio")
+        except Exception as e:
+            if "Sign in" in str(e) or "not available" in str(e):
+                raise  # YouTube refused the song itself: asking again won't help
+            info, path = _extract(vid, SAFE_ARGS), "safe"
     fmt = info
     if not info.get("url") and info.get("requested_formats"):
         fmt = info["requested_formats"][0]
@@ -1508,6 +1647,10 @@ def main():
 
     _prepare_cookies()
     _disk_load()
+    if os.environ.get("PM_WARMUP", "1").strip().lower() not in ("0", "false", "no", "off"):
+        threading.Thread(target=warm_up, daemon=True).start()
+    if not JS_RUNTIMES:
+        _log("no JavaScript runtime for yt-dlp (install Deno 2.3+ or Node 22+): fewer songs will play")
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
     restart_after = threading.Event()

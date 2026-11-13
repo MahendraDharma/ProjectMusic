@@ -1,0 +1,545 @@
+{
+ "about": "60 songs (20 western, 20 japanese, 20 indonesian) for the playback reliability test on victus. title/artist as YouTube Music lists them. duration_source 'deezer'/'itunes' = official recording length, used until server/tests/refresh_songs.py replaces it with YouTube Music's own length and videoId (duration_source 'ytmusic').",
+ "songs": [
+  {
+   "id": "w01",
+   "region": "western",
+   "title": "Anti-Hero",
+   "artist": "Taylor Swift",
+   "duration": 200,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w02",
+   "region": "western",
+   "title": "Cruel Summer",
+   "artist": "Taylor Swift",
+   "duration": 178,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w03",
+   "region": "western",
+   "title": "Blinding Lights",
+   "artist": "The Weeknd",
+   "duration": 200,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w04",
+   "region": "western",
+   "title": "Save Your Tears",
+   "artist": "The Weeknd",
+   "duration": 215,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w05",
+   "region": "western",
+   "title": "Viva La Vida",
+   "artist": "Coldplay",
+   "duration": 242,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w06",
+   "region": "western",
+   "title": "Yellow",
+   "artist": "Coldplay",
+   "duration": 266,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w07",
+   "region": "western",
+   "title": "Shape of You",
+   "artist": "Ed Sheeran",
+   "duration": 233,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w08",
+   "region": "western",
+   "title": "Perfect",
+   "artist": "Ed Sheeran",
+   "duration": 263,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w09",
+   "region": "western",
+   "title": "BIRDS OF A FEATHER",
+   "artist": "Billie Eilish",
+   "duration": 210,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w10",
+   "region": "western",
+   "title": "drivers license",
+   "artist": "Olivia Rodrigo",
+   "duration": 242,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w11",
+   "region": "western",
+   "title": "Levitating",
+   "artist": "Dua Lipa",
+   "duration": 203,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w12",
+   "region": "western",
+   "title": "As It Was",
+   "artist": "Harry Styles",
+   "duration": 167,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w13",
+   "region": "western",
+   "title": "Die With A Smile",
+   "artist": "Lady Gaga, Bruno Mars",
+   "duration": 250,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w14",
+   "region": "western",
+   "title": "Espresso",
+   "artist": "Sabrina Carpenter",
+   "duration": 175,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w15",
+   "region": "western",
+   "title": "Easy On Me",
+   "artist": "Adele",
+   "duration": 224,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w16",
+   "region": "western",
+   "title": "Believer",
+   "artist": "Imagine Dragons",
+   "duration": 202,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w17",
+   "region": "western",
+   "title": "Sugar",
+   "artist": "Maroon 5",
+   "duration": 235,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w18",
+   "region": "western",
+   "title": "Someone You Loved",
+   "artist": "Lewis Capaldi",
+   "duration": 182,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "w19",
+   "region": "western",
+   "title": "505",
+   "artist": "Arctic Monkeys",
+   "duration": 254,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "w20",
+   "region": "western",
+   "title": "Circles",
+   "artist": "Post Malone",
+   "duration": 215,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j01",
+   "region": "japanese",
+   "title": "アイドル",
+   "artist": "YOASOBI",
+   "duration": 213,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j02",
+   "region": "japanese",
+   "title": "夜に駆ける",
+   "artist": "YOASOBI",
+   "duration": 261,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j03",
+   "region": "japanese",
+   "title": "クリスマスソング",
+   "artist": "back number",
+   "duration": 340,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j04",
+   "region": "japanese",
+   "title": "水平線",
+   "artist": "back number",
+   "duration": 285,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j05",
+   "region": "japanese",
+   "title": "Pretender",
+   "artist": "Official HIGE DANdism",
+   "duration": 326,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j06",
+   "region": "japanese",
+   "title": "Subtitle",
+   "artist": "Official HIGE DANdism",
+   "duration": 305,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j07",
+   "region": "japanese",
+   "title": "Lemon",
+   "artist": "Kenshi Yonezu",
+   "duration": 256,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j08",
+   "region": "japanese",
+   "title": "KICK BACK",
+   "artist": "Kenshi Yonezu",
+   "duration": 193,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j09",
+   "region": "japanese",
+   "title": "うっせぇわ",
+   "artist": "Ado",
+   "duration": 205,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j10",
+   "region": "japanese",
+   "title": "新時代",
+   "artist": "Ado",
+   "duration": 227,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j11",
+   "region": "japanese",
+   "title": "白日",
+   "artist": "King Gnu",
+   "duration": 275,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j12",
+   "region": "japanese",
+   "title": "ケセラセラ",
+   "artist": "Mrs. GREEN APPLE",
+   "duration": 273,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j13",
+   "region": "japanese",
+   "title": "マリーゴールド",
+   "artist": "Aimyon",
+   "duration": 308,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j14",
+   "region": "japanese",
+   "title": "怪獣の花唄",
+   "artist": "Vaundy",
+   "duration": 225,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j15",
+   "region": "japanese",
+   "title": "紅蓮華",
+   "artist": "LiSA",
+   "duration": 239,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j16",
+   "region": "japanese",
+   "title": "前前前世 (movie ver.)",
+   "artist": "RADWIMPS",
+   "duration": 286,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j17",
+   "region": "japanese",
+   "title": "死ぬのがいいわ",
+   "artist": "Fujii Kaze",
+   "duration": 186,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j18",
+   "region": "japanese",
+   "title": "Bling-Bang-Bang-Born",
+   "artist": "Creepy Nuts",
+   "duration": 169,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "j19",
+   "region": "japanese",
+   "title": "ドライフラワー",
+   "artist": "Yuuri",
+   "duration": 286,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "j20",
+   "region": "japanese",
+   "title": "だから僕は音楽を辞めた",
+   "artist": "Yorushika",
+   "duration": 243,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "i01",
+   "region": "indonesian",
+   "title": "Untungnya, Hidup Harus Tetap Berjalan",
+   "artist": "Bernadya",
+   "duration": 182,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i02",
+   "region": "indonesian",
+   "title": "Satu Bulan",
+   "artist": "Bernadya",
+   "duration": 200,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i03",
+   "region": "indonesian",
+   "title": "Hati-Hati di Jalan",
+   "artist": "Tulus",
+   "duration": 242,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i04",
+   "region": "indonesian",
+   "title": "Monokrom",
+   "artist": "Tulus",
+   "duration": 214,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i05",
+   "region": "indonesian",
+   "title": "Evaluasi",
+   "artist": "Hindia",
+   "duration": 194,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i06",
+   "region": "indonesian",
+   "title": "Bertaut",
+   "artist": "Nadin Amizah",
+   "duration": 315,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i07",
+   "region": "indonesian",
+   "title": "Sial",
+   "artist": "Mahalini",
+   "duration": 243,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i08",
+   "region": "indonesian",
+   "title": "Merasa Indah",
+   "artist": "Tiara Andini",
+   "duration": 220,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i09",
+   "region": "indonesian",
+   "title": "Kesempurnaan Cinta",
+   "artist": "Rizky Febian",
+   "duration": 216,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i10",
+   "region": "indonesian",
+   "title": "Lantas",
+   "artist": "Juicy Luicy",
+   "duration": 234,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i11",
+   "region": "indonesian",
+   "title": "Gala Bunga Matahari",
+   "artist": "Sal Priadi",
+   "duration": 209,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i12",
+   "region": "indonesian",
+   "title": "Laskar Pelangi",
+   "artist": "Nidji",
+   "duration": 233,
+   "duration_source": "itunes",
+   "videoId": null
+  },
+  {
+   "id": "i13",
+   "region": "indonesian",
+   "title": "Separuh Aku",
+   "artist": "NOAH",
+   "duration": 266,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i14",
+   "region": "indonesian",
+   "title": "Dan",
+   "artist": "Sheila On 7",
+   "duration": 284,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i15",
+   "region": "indonesian",
+   "title": "Kangen",
+   "artist": "Dewa 19",
+   "duration": 300,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i16",
+   "region": "indonesian",
+   "title": "Kali Kedua",
+   "artist": "Raisa",
+   "duration": 257,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i17",
+   "region": "indonesian",
+   "title": "To the Bone",
+   "artist": "Pamungkas",
+   "duration": 344,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i18",
+   "region": "indonesian",
+   "title": "Waktu Yang Salah",
+   "artist": "Fiersa Besari",
+   "duration": 324,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i19",
+   "region": "indonesian",
+   "title": "Tutur Batin",
+   "artist": "Yura Yunita",
+   "duration": 215,
+   "duration_source": "deezer",
+   "videoId": null
+  },
+  {
+   "id": "i20",
+   "region": "indonesian",
+   "title": "Halu",
+   "artist": "Feby Putri",
+   "duration": 265,
+   "duration_source": "deezer",
+   "videoId": null
+  }
+ ]
+}
